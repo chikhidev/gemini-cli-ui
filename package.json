@@ -1,0 +1,8 @@
+{
+  "name": "gemini-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local web UI for the Gemini CLI",
+  "bin": { "gemini-ui": "server.js" },
+  "scripts": { "start": "node server.js" }
+}
