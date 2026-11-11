@@ -6100,6 +6100,7 @@
       get(k, d) {try {return JSON.parse(localStorage.getItem(k)) ?? d;} catch {return d;} },
       set(k, v) {try {localStorage.setItem(k, JSON.stringify(v));} catch { } },
     };
+    let nextPrompt = null;   // Gemini's "Next prompt" suggestion for the empty message box (see setNextPrompt)
     marked.setOptions({breaks: true, gfm: true});
     marked.use({renderer: {
       image(href, title, text) {
@@ -6412,7 +6413,7 @@
       $('approvalPill').title = planning
         ? 'Plan mode: Gemini only reads and writes a plan; you approve it before anything changes. Shift+Tab to switch.'
         : 'Approval mode (Shift+Tab to switch)';
-      if (!pendingSessionFile) $('input').placeholder = planning ? 'Describe the task; Gemini plans it first, you approve' : 'Message Gemini';
+      if (!pendingSessionFile && !nextPrompt) $('input').placeholder = planning ? 'Describe the task; Gemini plans it first, you approve' : 'Message Gemini';
       // A saved model that is no longer in the list (e.g. the old invalid "gemini-3.5-pro") falls back to Auto.
       if ($('model').selectedIndex < 0) {$('model').value = ''; store.set('gui.model', '');}
       $('modelLabel').textContent = ($('model').selectedOptions[0]?.text || 'Auto').replace(' (CLI default)', '');
@@ -6728,6 +6729,7 @@
 
     function newChat() {
       if (busy) return;
+      setNextPrompt(null);
       pendingSessionFile = null; renderImportChip(); $('input').placeholder = 'Message Gemini';
       setUrlSession(null);
       setContext(0);
@@ -6742,6 +6744,7 @@
     }
     const LOADING_MIN_MS = 900;
     async function openSession(s) {
+      setNextPrompt(null);
       current = {id: s.id, title: s.title, cwd: s.cwd};
       setUrlSession(s.id);
       restoreDraft();
@@ -7924,6 +7927,7 @@
 
       // phase, until Gemini produces something: sending (the request is on its way to the app's server) →
       // starting (the server is launching Gemini) → waiting (Gemini has the message and is waiting on Google)
+      setNextPrompt(null);                                 // a new reply starts: the old suggestion goes
       const msg = {role: 'assistant', parts: [], pending: true, phase: attach ? 'starting' : 'sending', lastEventAt: Date.now()};
       const view = new AssistantView(msg);
       if (attach?.startedAt) view.start = attach.startedAt;      // the timer counts from when Gemini really started
@@ -7980,6 +7984,7 @@
       const warn = ctxBanner();
       if (warn) view.body.appendChild(warn);
       view.render(); addQuickReplies(view, msg); setBusy(false); updateHint(); scrollDown(); loadSessions(); loadChanges(); refreshTreeSoon();
+      if (current === session) setNextPrompt(findNextPrompt(msg.parts.filter(p => p.kind === 'text').map(p => p.text).join('\n')));
       if (retry) finishRetry(retry.turn, view, msg);
       // An imported chat now exists as its own session: reopen it so the imported history is shown above.
       if (importing && session.id && current === session) openSession({id: session.id, title: session.title, cwd: session.cwd});
@@ -10103,6 +10108,53 @@ Context ${pct}% of the model's window`;
     $('input').addEventListener('keydown', e => {if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {e.preventDefault(); send();} });
     // Shift+Tab cycles the mode like the CLI: Auto-approve → Auto-edit → Plan
     $('input').addEventListener('keydown', e => { if (e.key === 'Tab' && e.shiftKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); cycleMode(); } });
+
+    // ---------- "Next prompt" suggestion ----------
+    // Gemini's replies end with a "Next prompt:" line and a code block holding a ready-to-send message. Once the
+    // reply is done, that message is shown as the empty box's placeholder; Tab puts it in the box (it is not
+    // sent), Esc dismisses it. It belongs to the last reply only: sending, a new reply, or another chat clears it.
+    const NEXT_PROMPT_LINES = 3, NEXT_PROMPT_CHARS = 240;
+    function findNextPrompt(text) {
+      const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+      let at = -1;
+      for (let i = lines.length - 1; i >= 0; i--) {
+        if (/^\s*(?:[*_]{1,2}\s*)?next prompt\s*:?\s*(?:[*_]{1,2})?\s*:?\s*$/i.test(lines[i])) { at = i; break; }
+      }
+      if (at < 0) return null;
+      let i = at + 1;
+      while (i < lines.length && !lines[i].trim()) i++;
+      const fence = lines[i]?.match(/^\s*(`{3,})/);
+      let body;
+      if (fence) {
+        const end = lines.findIndex((l, k) => k > i && l.trim().startsWith(fence[1]) && !l.trim().slice(fence[1].length).trim());
+        body = lines.slice(i + 1, end < 0 ? lines.length : end);
+      } else body = lines.slice(i);
+      const s = body.join('\n').trim();
+      return s || null;
+    }
+    function nextPromptPreview(s) {
+      const lines = s.split('\n');
+      let out = lines.slice(0, NEXT_PROMPT_LINES).join('\n');
+      const cut = lines.length > NEXT_PROMPT_LINES || out.length > NEXT_PROMPT_CHARS;
+      if (out.length > NEXT_PROMPT_CHARS) out = out.slice(0, NEXT_PROMPT_CHARS).trimEnd();
+      return out + (cut ? '…' : '') + ' (Tab to use)';
+    }
+    function setNextPrompt(s) {
+      const had = nextPrompt !== null;
+      nextPrompt = s || null;
+      if (nextPrompt) $('input').placeholder = nextPromptPreview(nextPrompt);
+      else if (had) syncPills();                         // back to "Message Gemini" (or the mode's text)
+      autosize();
+    }
+    $('input').addEventListener('keydown', (e) => {
+      if (!nextPrompt || $('input').value || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+      if (e.key === 'Tab' && !e.shiftKey) {
+        e.preventDefault();
+        const t = $('input'), s = nextPrompt;
+        t.value = s; t.setSelectionRange(s.length, s.length);
+        t.dispatchEvent(new Event('input', {bubbles: true}));    // resize and keep the draft, like typing
+      } else if (e.key === 'Escape' && !dictation) { e.preventDefault(); setNextPrompt(null); }
+    });
     $('newChat').onclick = newChat;
     const closeSide = () => {$('side').classList.remove('open'); $('scrim').classList.remove('open');};
     const isMobile = () => matchMedia('(max-width:760px)').matches;
