@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
-const { spawn, execSync, execFileSync } = require('child_process');
+const { spawn, execSync, execFile, execFileSync } = require('child_process');
 const history = require('./history');
 
 const ARGS = process.argv.slice(2);
@@ -368,6 +368,202 @@ function decodedDiff(cwd, file, cached) {
 const UPLOAD_DIR = path.join(os.homedir(), '.gemini-ui', 'uploads');
 const MAX_UPLOAD = 20 * 1024 * 1024;
 
+// ---------- folder access ----------
+// Folders outside the project that Gemini's own rules use (GEMINI.md points it at ~/.gemini/memory and
+// ~/.gemini/scratch). Gemini can only work in its workspace, so the UI asks once per project folder and
+// granted folders are added with --include-directories. Kept in ~/.gemini-ui/folder-access.json:
+//   { dirs: [extra folders to offer], projects: { <folder>: { allowed: [...], asked: [...] } } }
+const ACCESS_FILE = path.join(os.homedir(), '.gemini-ui', 'folder-access.json');
+const ACCESS_DEFAULT_DIRS = [path.join(os.homedir(), '.gemini', 'memory'), path.join(os.homedir(), '.gemini', 'scratch')];
+const accessKey = (p) => path.resolve(p).replace(/[\\/]+$/, '').toLowerCase();
+function readAccess() {
+  let a = {};
+  try { a = JSON.parse(fs.readFileSync(ACCESS_FILE, 'utf8')); } catch {}
+  if (!Array.isArray(a.dirs)) a.dirs = ACCESS_DEFAULT_DIRS;
+  if (!a.projects || typeof a.projects !== 'object') a.projects = {};
+  return a;
+}
+function writeAccess(a) {
+  fs.mkdirSync(path.dirname(ACCESS_FILE), { recursive: true });
+  fs.writeFileSync(ACCESS_FILE, JSON.stringify(a, null, 2));
+}
+const isWithin = (child, parent) => { const r = path.relative(parent, child); return !r || (!r.startsWith('..') && !path.isAbsolute(r)); };
+// The extra folders that apply to this project: existing ones that are not already inside it (or around it).
+function accessDirs(a, cwd) {
+  return a.dirs.filter((d) => { try { return fs.statSync(d).isDirectory() && !isWithin(d, cwd) && !isWithin(cwd, d); } catch { return false; } });
+}
+function accessState(cwd) {
+  if (!cwd || !fs.existsSync(cwd)) return { error: 'Folder not found' };
+  const a = readAccess(), p = a.projects[accessKey(cwd)] || { allowed: [], asked: [] };
+  const dirs = accessDirs(a, cwd), asked = new Set((p.asked || []).map(accessKey));
+  const allowed = new Set((p.allowed || []).map(accessKey));
+  return { dirs: dirs.map((d) => ({ path: d, allowed: allowed.has(accessKey(d)), asked: asked.has(accessKey(d)) })) };
+}
+// allow: folders to grant; every folder offered is marked as asked (so "Not now" does not ask again).
+function setAccess(cwd, allow, offered) {
+  if (!cwd || !fs.existsSync(cwd)) return { error: 'Folder not found' };
+  const a = readAccess(), k = accessKey(cwd), p = a.projects[k] || { allowed: [], asked: [] };
+  const known = new Set(a.dirs.map(accessKey));
+  const allowSet = new Set((allow || []).map(accessKey).filter((d) => known.has(d)));
+  const offeredSet = new Set((offered || []).map(accessKey).filter((d) => known.has(d)));
+  p.allowed = a.dirs.filter((d) => allowSet.has(accessKey(d)) || (!offeredSet.has(accessKey(d)) && (p.allowed || []).map(accessKey).includes(accessKey(d))));
+  p.asked = [...new Set([...(p.asked || []).map(accessKey), ...offeredSet])];
+  if (offered === null) p.asked = [];                 // "ask again"
+  a.projects[k] = p;
+  writeAccess(a);
+  return accessState(cwd);
+}
+// "/directory add <path>": offer that folder too, and allow it for this project.
+function addAccessDir(cwd, dir) {
+  if (!cwd || !fs.existsSync(cwd)) return { error: 'Folder not found' };
+  const d = path.resolve(String(dir || '').replace(/^~(?=$|[\\/])/, os.homedir()));
+  try { if (!fs.statSync(d).isDirectory()) return { error: 'Not a folder: ' + d }; } catch { return { error: 'Folder not found: ' + d }; }
+  if (isWithin(d, cwd)) return { error: 'That folder is already inside the project' };
+  const a = readAccess(), k = accessKey(cwd), p = a.projects[k] || { allowed: [], asked: [] };
+  if (!a.dirs.some((x) => accessKey(x) === accessKey(d))) a.dirs.push(d);
+  p.allowed = [...(p.allowed || []).filter((x) => accessKey(x) !== accessKey(d)), d];
+  p.asked = [...new Set([...(p.asked || []).map(accessKey), accessKey(d)])];
+  a.projects[k] = p;
+  writeAccess(a);
+  return { ...accessState(cwd), added: d };
+}
+function grantedDirs(cwd) {
+  const a = readAccess(), p = a.projects[accessKey(cwd)];
+  if (!p) return [];
+  const allowed = new Set((p.allowed || []).map(accessKey));
+  return accessDirs(a, cwd).filter((d) => allowed.has(accessKey(d)));
+}
+
+// ---------- custom slash commands ----------
+// Gemini runs custom commands (.toml files in ~/.gemini/commands, <project>/.gemini/commands and each
+// extension's commands folder) even without its terminal UI: a message starting with "/name" is expanded
+// into the command's prompt. This lists them for the message box's "/" menu. "git/commit.toml" is "/git:commit".
+function customCommands(cwd) {
+  const roots = [
+    { dir: path.join(os.homedir(), '.gemini', 'commands'), source: 'user' },
+  ];
+  try {
+    const ext = path.join(os.homedir(), '.gemini', 'extensions');
+    for (const e of fs.readdirSync(ext, { withFileTypes: true })) if (e.isDirectory()) roots.push({ dir: path.join(ext, e.name, 'commands'), source: e.name });
+  } catch {}
+  if (cwd) roots.push({ dir: path.join(cwd, '.gemini', 'commands'), source: 'project' });
+  const out = new Map();                                   // later roots win, as in Gemini (project over user)
+  for (const r of roots) {
+    const walk = (dir, prefix, depth) => {
+      let items = [];
+      try { items = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const it of items) {
+        const p = path.join(dir, it.name);
+        if (it.isDirectory() && depth < 4) walk(p, prefix + it.name + ':', depth + 1);
+        else if (it.isFile() && /\.toml$/i.test(it.name)) {
+          let text = '';
+          try { text = fs.readFileSync(p, 'utf8').slice(0, 20000); } catch { continue; }
+          const m = text.match(/^\s*description\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/m);
+          const name = prefix + it.name.replace(/\.toml$/i, '');
+          out.set(name, { name, description: m ? (m[1] ?? m[2]).replace(/\\(.)/g, '$1') : '', source: r.source, args: /\{\{args\}\}/.test(text) });
+        }
+      }
+    };
+    walk(r.dir, '', 0);
+  }
+  return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ---------- native file / folder dialogs (Windows) ----------
+// The page cannot get real paths from the browser's own pickers, so the server opens the Windows "Open" /
+// "Select folder" dialog (IFileOpenDialog, the same one VS Code shows) through PowerShell and returns the
+// chosen paths. The dialog sits on top through a hidden topmost owner window.
+const PICK_SCRIPT = path.join(os.homedir(), '.gemini-ui', 'pick.ps1');
+const PICK_SCRIPT_TEXT = String.raw`# Written by Gemini Studio: shows the Windows file/folder dialog and prints the chosen paths, one per line.
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+Add-Type -AssemblyName System.Windows.Forms
+if (-not ('GsPicker' -as [type])) {
+Add-Type -TypeDefinition @"
+using System; using System.Collections.Generic; using System.Runtime.InteropServices;
+public static class GsPicker {
+  [ComImport, Guid("DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7")] class FileOpenDialogRCW {}
+  [ComImport, Guid("d57c7288-d4ad-4768-be02-9d969532d960"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  interface IFileOpenDialog {
+    [PreserveSig] int Show(IntPtr hwnd);
+    void SetFileTypes(uint c, IntPtr f); void SetFileTypeIndex(uint i); void GetFileTypeIndex(out uint i);
+    void Advise(IntPtr p, out uint c); void Unadvise(uint c);
+    void SetOptions(uint fos); void GetOptions(out uint fos);
+    void SetDefaultFolder(IShellItem psi); void SetFolder(IShellItem psi);
+    void GetFolder(out IShellItem ppsi); void GetCurrentSelection(out IShellItem ppsi);
+    void SetFileName([MarshalAs(UnmanagedType.LPWStr)] string n); void GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string n);
+    void SetTitle([MarshalAs(UnmanagedType.LPWStr)] string t); void SetOkButtonLabel([MarshalAs(UnmanagedType.LPWStr)] string t);
+    void SetFileNameLabel([MarshalAs(UnmanagedType.LPWStr)] string t);
+    void GetResult(out IShellItem ppsi); void AddPlace(IShellItem psi, int fdap);
+    void SetDefaultExtension([MarshalAs(UnmanagedType.LPWStr)] string e);
+    void Close(int hr); void SetClientGuid(ref Guid g); void ClearClientData(); void SetFilter(IntPtr f);
+    void GetResults(out IShellItemArray ppenum); void GetSelectedItems(out IShellItemArray ppsai);
+  }
+  [ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  interface IShellItem {
+    void BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppv); void GetParent(out IShellItem ppsi);
+    void GetDisplayName(uint sigdn, [MarshalAs(UnmanagedType.LPWStr)] out string name);
+    void GetAttributes(uint mask, out uint attribs); void Compare(IShellItem psi, uint hint, out int order);
+  }
+  [ComImport, Guid("b63ea76d-1f85-456f-a19c-48159efa858b"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  interface IShellItemArray {
+    void BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppv); void GetPropertyStore(int flags, ref Guid riid, out IntPtr ppv);
+    void GetPropertyDescriptionList(IntPtr keyType, ref Guid riid, out IntPtr ppv); void GetAttributes(int flags, uint mask, out uint attribs);
+    void GetCount(out uint n); void GetItemAt(uint i, out IShellItem ppsi); void EnumItems(out IntPtr ppenum);
+  }
+  [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = false)]
+  static extern void SHCreateItemFromParsingName(string path, IntPtr pbc, ref Guid riid, out IShellItem item);
+  public static string[] Pick(bool folder, string title, string start, IntPtr owner) {
+    var d = (IFileOpenDialog)new FileOpenDialogRCW();
+    uint o; d.GetOptions(out o);
+    o |= 0x40 | 0x800;                                  // file system items only, path must exist
+    o |= folder ? 0x20u : (0x200u | 0x1000u);           // pick folders | several files that must exist
+    d.SetOptions(o);
+    if (!string.IsNullOrEmpty(title)) d.SetTitle(title);
+    if (!string.IsNullOrEmpty(start) && System.IO.Directory.Exists(start)) {
+      try { Guid g = typeof(IShellItem).GUID; IShellItem si; SHCreateItemFromParsingName(start, IntPtr.Zero, ref g, out si); d.SetFolder(si); } catch {}
+    }
+    if (d.Show(owner) != 0) return new string[0];       // cancelled
+    IShellItemArray arr; d.GetResults(out arr); uint n; arr.GetCount(out n);
+    var list = new List<string>();
+    for (uint i = 0; i < n; i++) { IShellItem it; arr.GetItemAt(i, out it); string s; it.GetDisplayName(0x80058000, out s); list.Add(s); }
+    return list.ToArray();
+  }
+}
+"@
+}
+$owner = New-Object System.Windows.Forms.Form
+$owner.TopMost = $true; $owner.ShowInTaskbar = $false; $owner.FormBorderStyle = 'None'; $owner.Opacity = 0
+$owner.StartPosition = 'CenterScreen'; $owner.Size = New-Object System.Drawing.Size(1, 1)
+$owner.Show(); $owner.Activate()
+try { [GsPicker]::Pick($env:GS_PICK_MODE -eq 'folder', $env:GS_PICK_TITLE, $env:GS_PICK_START, $owner.Handle) | ForEach-Object { [Console]::Out.WriteLine($_) } }
+finally { $owner.Close() }
+`;
+let picking = false;
+function nativePick(mode, start, title) {
+  if (process.platform !== 'win32') return Promise.resolve({ unsupported: true });
+  if (picking) return Promise.resolve({ busy: true });
+  try {
+    if (!fs.existsSync(PICK_SCRIPT) || fs.readFileSync(PICK_SCRIPT, 'utf8') !== PICK_SCRIPT_TEXT) {
+      fs.mkdirSync(path.dirname(PICK_SCRIPT), { recursive: true });
+      fs.writeFileSync(PICK_SCRIPT, PICK_SCRIPT_TEXT);
+    }
+  } catch (e) { return Promise.resolve({ unsupported: true, error: e.message }); }
+  picking = true;
+  return new Promise((resolve) => {
+    execFile('powershell.exe', ['-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', PICK_SCRIPT], {
+      windowsHide: true, timeout: 30 * 60 * 1000, maxBuffer: 4 * 1024 * 1024,
+      env: { ...process.env, GS_PICK_MODE: mode === 'folder' ? 'folder' : 'files', GS_PICK_START: start || '', GS_PICK_TITLE: title || '' },
+    }, (err, stdout, stderr) => {
+      picking = false;
+      if (err) return resolve({ unsupported: true, error: String(stderr || err.message).trim().split('\n')[0] });
+      const paths = String(stdout).split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+      if (mode === 'folder') return resolve({ paths });
+      resolve({ paths, files: paths.map((p) => { let size = 0; try { size = fs.statSync(p).size; } catch {} return { name: path.basename(p), path: p, size }; }) });
+    });
+  });
+}
+
 // ---------- plan mode ----------
 // In a headless run the CLI's policy auto-allows exit_plan_mode, which switches to YOLO and starts
 // implementing right away. This user-tier policy (beats the default tier) denies it instead, so the run
@@ -539,6 +735,8 @@ async function chat(req, res) {
   // Attachments dropped on the page live outside the project; Gemini only reads binary files (images,
   // PDFs) inside its workspace, so add the uploads folder to it.
   if (fs.existsSync(UPLOAD_DIR)) args.push('--include-directories', UPLOAD_DIR);
+  // and the outside folders the user allowed for this project (see folder access)
+  for (const d of grantedDirs(cwd)) args.push('--include-directories', d);
   if (model) args.push('-m', model);
   if (sessionId) { args.push('-r', sessionId); history.markUiSession(sessionId); }
   else if (sessionFile) {
@@ -767,6 +965,16 @@ http.createServer(async (req, res) => {
     if (url.pathname === '/api/dirs') return json(res, 200, listDirs(url.searchParams.get('path')));
     if (url.pathname === '/api/tree') return json(res, 200, treeDir(url.searchParams.get('cwd'), url.searchParams.get('path')));
     if (url.pathname === '/api/find') return json(res, 200, findFiles(url.searchParams.get('cwd'), url.searchParams.get('q')));
+    if (req.method === 'POST' && url.pathname === '/api/pick') {
+      const { mode, start, title } = await readBody(req);
+      return json(res, 200, await nativePick(mode, start, title));
+    }
+    if (url.pathname === '/api/access' && req.method === 'GET') return json(res, 200, accessState(url.searchParams.get('cwd')));
+    if (url.pathname === '/api/access' && req.method === 'POST') {
+      const { cwd, allow, offered, add } = await readBody(req);
+      try { return json(res, 200, add ? addAccessDir(cwd, add) : setAccess(cwd, allow, offered)); } catch (e) { return json(res, 200, { error: e.message }); }
+    }
+    if (url.pathname === '/api/commands') return json(res, 200, { commands: customCommands(url.searchParams.get('cwd')) });
     if (url.pathname === '/api/plan') return json(res, 200, readPlan(url.searchParams.get('sessionId'), url.searchParams.get('name')));
     if (url.pathname === '/api/read') return json(res, 200, readFileView(url.searchParams.get('cwd'), url.searchParams.get('path')));
     if (req.method === 'POST' && url.pathname === '/api/stat') {

@@ -35,7 +35,15 @@ After updating the files, stop it and start it again (the page itself only needs
 - **Plan mode** (also `/plan`, or `/plan <task>`): Gemini only reads and writes a plan; nothing is changed. The reply
   shows the plan with **Approve and build** (pick Auto-approve or Auto-edit for the build) and **Request changes**.
   Plans are kept in Gemini's temp folder (`~/.gemini/tmp`), which Windows may clean up over time.
+- **Commands:** type `/` in the message box for a menu of commands (↑ ↓, Tab or Enter, Esc). App commands
+  (`/new`, `/plan`, `/auto-approve`, `/auto-edit`, `/model`, `/directory add <path>`, `/files`, `/changes`,
+  `/copy`, `/theme`, `/settings`, `/help`) run in the page; `/init` and your custom `.toml` commands (yours,
+  the project's and your extensions') are sent to Gemini, which runs them.
 - Chats are the Gemini CLI's own sessions (in `~/.gemini`), so they also show up in the `gemini` terminal, and the
   other way round.
 - Uploaded attachments are copied to `~/.gemini-ui/uploads`.
+- **Folder access:** the first chat in a folder asks whether Gemini may also use `~/.gemini/memory` and
+  `~/.gemini/scratch` (when they exist). Allowed folders are added to its workspace for that project; change it in
+  Settings → Folder access. Answers are kept in `~/.gemini-ui/folder-access.json`.
+- On Windows the folder button and the attach button open the real Windows dialogs (elsewhere, the in-page picker).
 - If the Gemini CLI is installed somewhere unusual, set `GEMINI_JS` to the path of its `gemini.js`.
