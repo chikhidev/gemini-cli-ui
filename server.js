@@ -83,7 +83,22 @@ const insideDir = (root, f) => {
   const rel = path.relative(path.resolve(root), path.resolve(f));
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 };
-const readable = (cwd, f) => insideDir(UPLOAD_DIR, f) || insideDir(cwd, f);
+// Besides the project and the uploads, the viewer may open Gemini's global folder (~/.gemini: its memory,
+// scratch files, settings, skills) and the outside folders allowed for this project; never the sign-in files.
+const GEMINI_HOME = path.join(os.homedir(), '.gemini');
+const SECRET_FILES = /^(oauth_creds\.json|google_accounts\.json|installation_id|mcp-oauth-tokens.*\.json|.*\.(key|pem)|\.env(\..*)?)$/i;
+const isSecret = (f) => insideDir(GEMINI_HOME, f) && (SECRET_FILES.test(path.basename(f)) || /[\\/]\.gemini[\\/](oauth|auth)[\\/]/i.test(f));
+let grantedCache = { cwd: null, at: 0, dirs: [] };
+function grantedFor(cwd) {
+  if (grantedCache.cwd !== cwd || Date.now() - grantedCache.at > 2000) {
+    let dirs = [];
+    try { dirs = cwd ? grantedDirs(cwd) : []; } catch {}
+    grantedCache = { cwd, at: Date.now(), dirs };
+  }
+  return grantedCache.dirs;
+}
+const readable = (cwd, f) => insideDir(UPLOAD_DIR, f) || insideDir(cwd, f)
+  || ((insideDir(GEMINI_HOME, f) || grantedFor(cwd).some((d) => insideDir(d, f))) && !isSecret(f));
 const resolveIn = (cwd, p) => path.resolve(cwd || '', String(p || ''));
 
 function treeDir(cwd, dir) {
@@ -97,12 +112,12 @@ function treeDir(cwd, dir) {
 
 const MAX_VIEW = 2 * 1024 * 1024;
 
-// Save text from the file viewer (the CSV table editor). Only inside the working folder. Keeps the file's
+// Save text from the file viewer (the CSV table editor). Only where the viewer may read (see readable). Keeps the file's
 // encoding (UTF-8 with or without BOM, UTF-16LE with BOM), and refuses when the file changed on disk since it
 // was read (mtime = the mtimeMs the viewer got), so edits Gemini made meanwhile are never overwritten silently.
 function writeFileView(cwd, p, text, mtime) {
   const abs = resolveIn(cwd, p);
-  if (!cwd || !insideDir(cwd, abs)) return { error: 'Outside the working folder' };
+  if (!cwd || insideDir(UPLOAD_DIR, abs) || !readable(cwd, abs)) return { error: 'Outside the working folder' };
   if (typeof text !== 'string') return { error: 'Nothing to save' };
   let st = null;
   try { st = fs.statSync(abs); } catch {}
