@@ -10114,21 +10114,45 @@ Context ${pct}% of the model's window`;
     // reply is done, that message is shown as the empty box's placeholder; Tab puts it in the box (it is not
     // sent), Esc dismisses it. It belongs to the last reply only: sending, a new reply, or another chat clears it.
     const NEXT_PROMPT_LINES = 3, NEXT_PROMPT_CHARS = 240;
+    // Reads the reply's own markdown (not the rendered page), so code fences are seen as fences.
+    const NP_LABEL = /^\s*(?:[*_]{1,2}\s*)?next prompt\s*:?\s*(?:[*_]{1,2})?\s*:?\s*$/i;
+    const NP_FENCE = /^\s*(`{3,}|~{3,})\s*([\w+#.-]*)\s*$/;        // ``` or ```vbnet (also ~~~)
+    const NP_STEP = /^\s*(?:[*_]{1,2})?\s*(?:topic|step)\s*:\s*(?:[*_]{1,2})?\s*/i;
     function findNextPrompt(text) {
       const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+      // which lines sit inside a code block, and where each block closes
+      const inBlock = [], closeOf = [];
+      let open = -1, mark = '';
+      lines.forEach((l, i) => {
+        const f = l.match(NP_FENCE);
+        if (open < 0 && f) { open = i; mark = f[1]; inBlock[i] = false; return; }
+        if (open >= 0 && f && f[1][0] === mark[0] && f[1].length >= mark.length && !f[2]) { closeOf[open] = i; open = -1; inBlock[i] = false; return; }
+        inBlock[i] = open >= 0;
+      });
       let at = -1;
-      for (let i = lines.length - 1; i >= 0; i--) {
-        if (/^\s*(?:[*_]{1,2}\s*)?next prompt\s*:?\s*(?:[*_]{1,2})?\s*:?\s*$/i.test(lines[i])) { at = i; break; }
-      }
+      for (let i = lines.length - 1; i >= 0; i--) if (NP_LABEL.test(lines[i])) { at = i; break; }
       if (at < 0) return null;
-      let i = at + 1;
-      while (i < lines.length && !lines[i].trim()) i++;
-      const fence = lines[i]?.match(/^\s*(`{3,})/);
       let body;
-      if (fence) {
-        const end = lines.findIndex((l, k) => k > i && l.trim().startsWith(fence[1]) && !l.trim().slice(fence[1].length).trim());
-        body = lines.slice(i + 1, end < 0 ? lines.length : end);
-      } else body = lines.slice(i);
+      if (inBlock[at]) {
+        // "Next prompt:" is the first line inside the block: the rest of that block
+        let end = at + 1;
+        while (end < lines.length && !(lines[end].match(NP_FENCE) && !inBlock[end])) end++;
+        body = lines.slice(at + 1, end);
+      } else {
+        let i = at + 1;
+        while (i < lines.length && !lines[i].trim()) i++;
+        if (i < lines.length && lines[i].match(NP_FENCE)) body = lines.slice(i + 1, closeOf[i] ?? lines.length);
+        else body = lines.slice(i);
+      }
+      // never keep fence lines (or a fence stuck to the end of the text), nor a repeated label
+      body = body.filter(l => !NP_FENCE.test(l)).map(l => l.replace(/\s*(`{3,}|~{3,})\s*$/, ''));
+      while (body.length && (!body[0].trim() || NP_LABEL.test(body[0]))) body.shift();
+      // "Topic: …" / "Step: …" on every line: drop the labels and make one sentence of them
+      const used = body.filter(l => l.trim());
+      if (used.length && used.every(l => NP_STEP.test(l))) {
+        const parts = used.map(l => l.replace(NP_STEP, '').trim()).filter(Boolean);
+        return parts.map((p, k) => k < parts.length - 1 && !/[.!?:;,]$/.test(p) ? p + '.' : p).join(' ') || null;
+      }
       const s = body.join('\n').trim();
       return s || null;
     }
