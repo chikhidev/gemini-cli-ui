@@ -96,6 +96,31 @@ function treeDir(cwd, dir) {
 }
 
 const MAX_VIEW = 2 * 1024 * 1024;
+
+// Save text from the file viewer (the CSV table editor). Only inside the working folder. Keeps the file's
+// encoding (UTF-8 with or without BOM, UTF-16LE with BOM), and refuses when the file changed on disk since it
+// was read (mtime = the mtimeMs the viewer got), so edits Gemini made meanwhile are never overwritten silently.
+function writeFileView(cwd, p, text, mtime) {
+  const abs = resolveIn(cwd, p);
+  if (!cwd || !insideDir(cwd, abs)) return { error: 'Outside the working folder' };
+  if (typeof text !== 'string') return { error: 'Nothing to save' };
+  let st = null;
+  try { st = fs.statSync(abs); } catch {}
+  if (st && !st.isFile()) return { error: 'Not a file' };
+  if (st && mtime && Math.abs(st.mtimeMs - Number(mtime)) > 1) return { conflict: true, error: 'The file changed on disk since you opened it' };
+  let bom = null, enc = 'utf8';
+  if (st && st.size >= 2) {
+    const head = Buffer.alloc(3), fd = fs.openSync(abs, 'r');
+    try { fs.readSync(fd, head, 0, 3, 0); } finally { fs.closeSync(fd); }
+    if (head[0] === 0xFF && head[1] === 0xFE) { bom = Buffer.from([0xFF, 0xFE]); enc = 'utf16le'; }
+    else if (head[0] === 0xEF && head[1] === 0xBB && head[2] === 0xBF) bom = Buffer.from([0xEF, 0xBB, 0xBF]);
+  }
+  const body = Buffer.from(text, enc);
+  fs.writeFileSync(abs, bom ? Buffer.concat([bom, body]) : body);
+  const after = fs.statSync(abs);
+  return { ok: true, mtime: after.mtimeMs, size: after.size };
+}
+
 function readFileView(cwd, p) {
   const abs = resolveIn(cwd, p);
   if (!readable(cwd, abs)) return { error: 'Outside the working folder' };
@@ -343,6 +368,45 @@ function decodedDiff(cwd, file, cached) {
 const UPLOAD_DIR = path.join(os.homedir(), '.gemini-ui', 'uploads');
 const MAX_UPLOAD = 20 * 1024 * 1024;
 
+// ---------- plan mode ----------
+// In a headless run the CLI's policy auto-allows exit_plan_mode, which switches to YOLO and starts
+// implementing right away. This user-tier policy (beats the default tier) denies it instead, so the run
+// ends with the plan and the UI shows an Approve / Request changes card.
+const PLAN_POLICY = path.join(os.homedir(), '.gemini-ui', 'plan-review.toml');
+const PLAN_POLICY_TEXT = `# Written by Gemini Studio: the plan is approved in the UI, not inside the run.
+[[rule]]
+toolName = "exit_plan_mode"
+decision = "deny"
+priority = 900
+modes = ["plan"]
+denyMessage = "The plan is complete. The user reviews and approves it in Gemini Studio, not through this tool. Do not call exit_plan_mode again and do not start implementing. End your turn now with a short summary of the plan."
+`;
+function planReviewPolicy() {
+  try {
+    if (!fs.existsSync(PLAN_POLICY) || fs.readFileSync(PLAN_POLICY, 'utf8') !== PLAN_POLICY_TEXT) {
+      fs.mkdirSync(path.dirname(PLAN_POLICY), { recursive: true });
+      fs.writeFileSync(PLAN_POLICY, PLAN_POLICY_TEXT);
+    }
+    return PLAN_POLICY;
+  } catch { return null; }
+}
+// Plans live in ~/.gemini/tmp/<project>/<sessionId>/plans/<name>.md (older CLIs: .../<project>/plans).
+function readPlan(sessionId, name) {
+  const file = path.basename(String(name || ''));
+  if (!/\.md$/i.test(file) || (sessionId && !/^[\w-]+$/.test(sessionId))) return { error: 'Bad plan name' };
+  const tmp = path.join(os.homedir(), '.gemini', 'tmp');
+  let projects = [];
+  try { projects = fs.readdirSync(tmp, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch {}
+  const candidates = [];
+  for (const p of projects) {
+    if (sessionId) candidates.push(path.join(tmp, p, sessionId, 'plans', file));
+    candidates.push(path.join(tmp, p, 'plans', file));
+  }
+  const found = candidates.filter((c) => fs.existsSync(c)).sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
+  if (!found) return { error: 'Plan file not found (Windows may have cleaned the temp folder)' };
+  return { path: found, text: fs.readFileSync(found, 'utf8') };
+}
+
 function saveUpload({ name, data }) {
   if (!name || typeof data !== 'string') return { error: 'A name and file data are required' };
   const buf = Buffer.from(data, 'base64');
@@ -467,7 +531,11 @@ async function chat(req, res) {
   if (!prompt || !cwd) return json(res, 400, { error: 'prompt and cwd are required' });
   if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) return json(res, 400, { error: 'Working directory does not exist: ' + cwd });
 
-  const args = [...GEMINI_PRE, '-o', 'stream-json', '--skip-trust', '--approval-mode', approvalMode || 'yolo'];
+  const mode = ['yolo', 'auto_edit', 'plan'].includes(approvalMode) ? approvalMode : 'yolo';
+  const args = [...GEMINI_PRE, '-o', 'stream-json', '--skip-trust', '--approval-mode', mode];
+  // Headless plan mode approves its own plan and starts editing in the same run; this policy stops it
+  // after the plan so the user can approve it in the UI instead.
+  if (mode === 'plan') { const p = planReviewPolicy(); if (p) args.push('--policy', p); }
   // Attachments dropped on the page live outside the project; Gemini only reads binary files (images,
   // PDFs) inside its workspace, so add the uploads folder to it.
   if (fs.existsSync(UPLOAD_DIR)) args.push('--include-directories', UPLOAD_DIR);
@@ -699,10 +767,16 @@ http.createServer(async (req, res) => {
     if (url.pathname === '/api/dirs') return json(res, 200, listDirs(url.searchParams.get('path')));
     if (url.pathname === '/api/tree') return json(res, 200, treeDir(url.searchParams.get('cwd'), url.searchParams.get('path')));
     if (url.pathname === '/api/find') return json(res, 200, findFiles(url.searchParams.get('cwd'), url.searchParams.get('q')));
+    if (url.pathname === '/api/plan') return json(res, 200, readPlan(url.searchParams.get('sessionId'), url.searchParams.get('name')));
     if (url.pathname === '/api/read') return json(res, 200, readFileView(url.searchParams.get('cwd'), url.searchParams.get('path')));
     if (req.method === 'POST' && url.pathname === '/api/stat') {
       const { cwd, paths } = await readBody(req);
       return json(res, 200, statPaths(cwd, paths));
+    }
+    if (req.method === 'POST' && url.pathname === '/api/write') {
+      const { cwd, path: p, text, mtime } = await readBody(req);
+      try { return json(res, 200, writeFileView(cwd, p, text, mtime)); }
+      catch (e) { return json(res, 200, { error: e.message }); }
     }
     if (req.method === 'POST' && url.pathname === '/api/open') {
       const { cwd, path: p, how } = await readBody(req);

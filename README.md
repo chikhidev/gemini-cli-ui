@@ -30,7 +30,11 @@ After updating the files, stop it and start it again (the page itself only needs
 ## Good to know
 
 - New chats run Gemini in **auto-approve mode ("yolo")** by default: it can edit files and run commands in the folder
-  you choose without asking. Change it with the selector under the message box if you want it to ask first.
+  you choose without asking. Switch modes with the pill under the message box, or Shift+Tab in the message box:
+  Auto-approve → Auto-edit → Plan.
+- **Plan mode** (also `/plan`, or `/plan <task>`): Gemini only reads and writes a plan; nothing is changed. The reply
+  shows the plan with **Approve and build** (pick Auto-approve or Auto-edit for the build) and **Request changes**.
+  Plans are kept in Gemini's temp folder (`~/.gemini/tmp`), which Windows may clean up over time.
 - Chats are the Gemini CLI's own sessions (in `~/.gemini`), so they also show up in the `gemini` terminal, and the
   other way round.
 - Uploaded attachments are copied to `~/.gemini-ui/uploads`.
