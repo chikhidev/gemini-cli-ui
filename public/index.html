@@ -2331,10 +2331,32 @@
       opacity: 1
     }
 
-    /* in the stats row the copy icon is always there, small and quiet like the stats around it */
+    /* in the stats row the copy icon sits with the stats, small and quiet like them */
     .stats .actions {
       margin: 0 0 0 -8px;
       opacity: 1
+    }
+
+    /* the stats row (time, tokens, tool calls, models, copy) shows only while the reply is hovered; its space
+       stays reserved so nothing moves. The ‹ 1/2 › version switch stays visible. */
+    .msg.ai .stats > span,
+    .msg.ai .stats .actions > :not(.vnav) {
+      opacity: 0;
+      transition: opacity .18s var(--ease)
+    }
+
+    .msg.ai:hover .stats > span,
+    .msg.ai:hover .stats .actions > :not(.vnav),
+    .msg.ai .stats:focus-within > span,
+    .msg.ai .stats:focus-within .actions > :not(.vnav) {
+      opacity: 1
+    }
+
+    @media (hover: none) {
+      .msg.ai .stats > span,
+      .msg.ai .stats .actions > :not(.vnav) {
+        opacity: 1
+      }
     }
 
     .u-btn.a-copy {
