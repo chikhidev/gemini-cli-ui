@@ -4864,6 +4864,31 @@
       color: var(--text)
     }
 
+    /* unsaved edits, tinted in the primary color (opaque, so the sticky header row stays solid) */
+    .csv-table tr td.chg,
+    .csv-table tr.cur-row td.chg,
+    .csv-table thead tr:not(.letters) td.chg {
+      background: color-mix(in srgb, var(--accent) 24%, var(--surface));
+      box-shadow: inset 2px 0 0 var(--accent);
+      color: var(--text)
+    }
+
+    .csv-table td.chg:focus {
+      background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+      box-shadow: inset 0 0 0 2px var(--accent)
+    }
+
+    .csv-state .chg-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin-right: 6px;
+      border-radius: 2px;
+      background: color-mix(in srgb, var(--accent) 45%, var(--surface));
+      box-shadow: inset 2px 0 0 var(--accent);
+      vertical-align: 0
+    }
+
     .csv-bar .csv-md.on {
       background: var(--hover);
       color: var(--text);
@@ -8736,6 +8761,7 @@ Context ${pct}% of the model's window`;
       if (!viewing.csv || viewing.csv.src !== viewing.text) {
         const d = csvDelimiter(viewing.text, viewing.path);
         viewing.csv = {d, rows: parseCsv(viewing.text, d), src: viewing.text, endNl: viewing.text.endsWith('\n'), cur: null};
+        csvMarkSaved();
       }
       const csv = viewing.csv, rows = csv.rows, shown = rows.slice(0, CSV_MAX_ROWS);
       let cols = 1; shown.forEach(r => { if (r.length > cols) cols = r.length; });
@@ -8744,7 +8770,8 @@ Context ${pct}% of the model's window`;
       const md = csvMdOn();
       const cell = (r, c, tag) => {
         const v = rows[r]?.[c] ?? '', h = md ? csvMdHtml(v) : null;
-        return `<${tag} contenteditable="plaintext-only" spellcheck="false" data-r="${r}" data-c="${c}"${h ? ' class="mdc"' : ''}>${h ?? esc(v)}</${tag}>`;
+        const cls = [h && 'mdc', csvIsChanged(r, c) && 'chg'].filter(Boolean).join(' ');
+        return `<${tag} contenteditable="plaintext-only" spellcheck="false" data-r="${r}" data-c="${c}"${cls ? ` class="${cls}"` : ''}>${h ?? esc(v)}</${tag}>`;
       };
       const line = (r, tag) => `<tr><th class="rn">${r + 1}</th>${Array.from({length: cols}, (_, c) => cell(r, c, tag)).join('')}</tr>`;
       body.innerHTML = `<div class="csv-bar">
@@ -8803,6 +8830,22 @@ Context ${pct}% of the model's window`;
       if (h) { td.innerHTML = h; td.classList.add('mdc'); }
       if (!$('fvFindBar').hidden) refreshFind(true);
     }
+    // Unsaved edits are tinted in the primary color. Each row array keeps its saved values in row.o (a row
+    // added since the save has none); adding or deleting a column splices row.o too, with NEW in the new column.
+    const CSV_NEW = {};
+    function csvMarkSaved() { viewing.csv.rows.forEach(r => { r.o = r.slice(); }); }
+    function csvIsChanged(r, c) {
+      const row = viewing.csv.rows[r];
+      if (!row) return false;
+      if (!row.o) return true;                        // a new row
+      const o = row.o[c];
+      return o === CSV_NEW || (o ?? '') !== (row[c] ?? '');
+    }
+    function csvChangedCount() {
+      let n = 0;
+      viewing.csv.rows.forEach((row, r) => { for (let c = 0; c < Math.max(row.length, row.o?.length || 0); c++) if (csvIsChanged(r, c)) n++; });
+      return n;
+    }
     function csvCell(td) { return td && td.matches('td[data-r]') ? {r: +td.dataset.r, c: +td.dataset.c} : null; }
     function setCsvCell(r, c, v) {
       const rows = viewing.csv.rows;
@@ -8818,7 +8861,9 @@ Context ${pct}% of the model's window`;
       bar.querySelector('.csv-save').hidden = !viewing.dirty;
       const st = bar.querySelector('.csv-state');
       st.className = 'csv-state' + (note?.cls ? ' ' + note.cls : '');
-      st.innerHTML = note?.html ?? (viewing.dirty ? 'Unsaved changes' : '');
+      let n = 0;
+      if (!note && viewing.dirty) n = csvChangedCount();
+      st.innerHTML = note?.html ?? (viewing.dirty ? `<span class="chg-dot"></span>Unsaved changes${n ? ` · ${n.toLocaleString()} cell${n === 1 ? '' : 's'}` : ''}` : '');
       const has = !!viewing.csv?.cur;
       bar.querySelector('[data-a=delrow]').disabled = !has;
       bar.querySelector('[data-a=delcol]').disabled = !has;
@@ -8838,6 +8883,7 @@ Context ${pct}% of the model's window`;
       if (r.error) return updateCsvState({cls: 'warn', html: esc(r.error)});
       v.mtime = r.mtime; v.dirty = false;
       v.text = v.csv.src = csvText('\n');
+      if (viewing === v) { csvMarkSaved(); $('fvBody').querySelectorAll('.csv-table td.chg').forEach(td => td.classList.remove('chg')); }
       updateCsvState({cls: 'ok', html: 'Saved'});
       loadChanges(true);
     }
@@ -8851,17 +8897,18 @@ Context ${pct}% of the model's window`;
         case 'save': return saveCsv();
         case 'overwrite': return saveCsv(true);
         case 'md': store.set('gui.csvMd', !csvMdOn()); return renderCsvTable();
-        case 'reload': viewing.dirty = false; viewing.mtime = -1; return refreshOpenFile();
+        case 'reload': viewing.dirty = false; viewing.mtime = -1; viewing.csv = null; return refreshOpenFile();   // re-read the table from disk
         case 'row': { const at = cur ? cur.r + 1 : rows.length; rows.splice(at, 0, Array(width).fill('')); csvChanged(); return renderCsvTable({r: at, c: cur ? cur.c : 0}); }
-        case 'col': { const at = cur ? cur.c + 1 : width; rows.forEach(r => { while (r.length < at) r.push(''); r.splice(at, 0, ''); }); csvChanged(); return renderCsvTable({r: cur ? cur.r : 0, c: at}); }
+        case 'col': { const at = cur ? cur.c + 1 : width; rows.forEach(r => { while (r.length < at) r.push(''); r.splice(at, 0, ''); if (r.o) { while (r.o.length < at) r.o.push(undefined); r.o.splice(at, 0, CSV_NEW); } }); csvChanged(); return renderCsvTable({r: cur ? cur.r : 0, c: at}); }
         case 'delrow': if (!cur) return; rows.splice(cur.r, 1); csv.cur = null; csvChanged(); return renderCsvTable(rows.length ? {r: Math.min(cur.r, rows.length - 1), c: cur.c} : null);
-        case 'delcol': if (!cur) return; rows.forEach(r => { if (r.length > cur.c) r.splice(cur.c, 1); }); csv.cur = null; csvChanged(); return renderCsvTable({r: cur.r, c: Math.max(0, cur.c - 1)});
+        case 'delcol': if (!cur) return; rows.forEach(r => { if (r.length > cur.c) r.splice(cur.c, 1); if (r.o && r.o.length > cur.c) r.o.splice(cur.c, 1); }); csv.cur = null; csvChanged(); return renderCsvTable({r: cur.r, c: Math.max(0, cur.c - 1)});
       }
     });
     $('fvBody').addEventListener('input', (e) => {
       const at = csvCell(e.target);
       if (!at || !viewing?.csv) return;
       setCsvCell(at.r, at.c, e.target.textContent);
+      e.target.classList.toggle('chg', csvIsChanged(at.r, at.c));
       csvChanged();
     });
     $('fvBody').addEventListener('focusin', (e) => {
@@ -9085,7 +9132,8 @@ Context ${pct}% of the model's window`;
       if (typeof viewing?.text !== 'string' || !viewing.alt) return;
       const next = viewing.mode === viewing.alt ? 'source' : viewing.alt;
       store.set(viewing.alt === 'table' ? 'gui.csvTable' : 'gui.mdPreview', next === viewing.alt);
-      if (viewing.csv && viewing.dirty) viewing.text = csvText();     // the source view shows the edits too
+      // the source view shows the edits too (and the table keeps its rows, so the edits stay marked)
+      if (viewing.csv && viewing.dirty) viewing.text = viewing.csv.src = csvText();
       renderFileBody(next);
     };
     $('fvWrap').onclick = () => {
