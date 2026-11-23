@@ -8737,11 +8737,11 @@
 
     .wn-ok:hover { background: color-mix(in srgb, var(--text) 16%, transparent); color: var(--text) }
 
-    /* files changed: when there are changes the icon gives way to just the number (no floating badge) */
+    /* files changed: when there are changes the icon gives way to the number, shown as a tag (not a floating badge) */
     #changesPill.changed {
       width: auto;
-      min-width: 32px;
-      padding: 0 9px
+      min-width: 0;
+      padding: 0 6px
     }
 
     #changesPill.changed .ico-diff {
@@ -8750,15 +8750,16 @@
 
     #changesPill.changed .badge {
       position: static;
-      min-width: 0;
-      height: auto;
-      padding: 0;
+      box-sizing: border-box;
+      min-width: 26px;
+      height: 22px;
+      padding: 0 9px;
       border: 0;
-      border-radius: 0;
-      background: none;
-      box-shadow: none;
-      color: var(--accent);
-      font-size: 14px;
+      border-radius: 999px;
+      background: var(--accent-grad);
+      box-shadow: var(--glass);
+      color: #fff;
+      font-size: 12.5px;
       font-weight: 480;
       letter-spacing: 0
     }
