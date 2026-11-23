@@ -8737,6 +8737,32 @@
 
     .wn-ok:hover { background: color-mix(in srgb, var(--text) 16%, transparent); color: var(--text) }
 
+    /* files changed: when there are changes the icon gives way to just the number (no floating badge) */
+    #changesPill.changed {
+      width: auto;
+      min-width: 32px;
+      padding: 0 9px
+    }
+
+    #changesPill.changed .ico-diff {
+      display: none
+    }
+
+    #changesPill.changed .badge {
+      position: static;
+      min-width: 0;
+      height: auto;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: none;
+      box-shadow: none;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 480;
+      letter-spacing: 0
+    }
+
     /* tight window: the panel floats over the chat, so it keeps a shadow */
     @media (min-width:761px) and (max-width:1100px) {
       #diffPanel {
