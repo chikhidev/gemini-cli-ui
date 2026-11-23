@@ -174,6 +174,7 @@
       store.set('gui.theme', b.dataset.theme); applyTheme(b.dataset.theme); syncThemeSeg();
     };
     function openSettings() {
+      if (typeof renderTrustedDomains === 'function') renderTrustedDomains();
       preloadFontPreviews();
       fillFontSelect($('uiFont'), UI_FONTS, 'gui.uiFont', 'Google Sans');
       fillFontSelect($('monoFont'), MONO_FONTS, 'gui.monoFont', 'JetBrains Mono');

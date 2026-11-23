@@ -216,6 +216,8 @@
         if (!start) { olderObserver.disconnect(); mark.remove(); return; }
         olderObserver.unobserve(mark); olderObserver.observe(mark);         // still close to the top? next batch
       };
+      // find in conversation builds every remaining batch at once, so its search covers the whole chat
+      mark.loadAll = () => { while (mark.isConnected && current?.id === id) loadMore(); };
       olderObserver = new IntersectionObserver((es) => { if (es.some(e => e.isIntersecting)) loadMore(); },
         {root: chat, rootMargin: '800px 0px 0px 0px'});
       olderObserver.observe(mark);

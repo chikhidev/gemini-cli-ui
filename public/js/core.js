@@ -67,12 +67,15 @@
     function refFromUrl(href) {
       let u; try { u = new URL(href); } catch { return null; }
       if (!/^https?:$/.test(u.protocol)) return null;
+      // a link only looks like a Jira / Confluence chip when it really is on an Atlassian site (or the site you
+      // already trusted); anything else stays a plain link, so a look-alike address cannot pass as a ticket
+      if (!chipHostOk(u)) return null;
       const path = decodeURIComponent(u.pathname.replace(/\+/g, ' '));
       let m = path.match(/\/browse\/([A-Z][A-Z0-9_]+-\d+)/) || path.match(/\/issues\/([A-Z][A-Z0-9_]+-\d+)/)
         || (u.searchParams.get('selectedIssue') || '').match(/^([A-Z][A-Z0-9_]+-\d+)$/);
       if (m) {
         const j = jiraInfo(), key = m[1], prefix = key.replace(/-\d+$/, '');
-        if (j.base !== u.origin || !j.keys.includes(prefix)) store.set('gui.jira', {base: u.origin, keys: [...new Set([...(j.base === u.origin ? j.keys : []), prefix])].slice(-30)});
+        if (isTrustedLink(u.href) && (j.base !== u.origin || !j.keys.includes(prefix))) store.set('gui.jira', {base: u.origin, keys: [...new Set([...(j.base === u.origin ? j.keys : []), prefix])].slice(-30)});
         return {kind: 'jira', label: key};
       }
       if (/\/whiteboards?\/[^/]+/.test(path)) return {kind: 'wb', label: 'Whiteboard'};

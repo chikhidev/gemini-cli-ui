@@ -56,6 +56,7 @@
     // pick, Esc to close). App commands run here in the page; Gemini commands (/init and your custom .toml
     // commands, listed by the server) are sent to Gemini, which expands them into their prompt.
     const APP_COMMANDS = [
+      {name: 'find', args: '[text]', desc: 'Find text in this conversation', run: (a) => openChatFind(a)},
       {name: 'help', desc: 'List all commands', run: () => { $('input').value = '/'; autosize(); slashUpdate(); }},
       {name: 'new', desc: 'Start a new chat', alias: ['clear'], run: () => newChat()},
       {name: 'plan', args: '[task]', desc: 'Plan mode: Gemini only reads and writes a plan (with a task: plan it now)'},

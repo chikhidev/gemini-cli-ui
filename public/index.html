@@ -92,6 +92,7 @@
       <div class="top-tools" id="topTools">
         <button class="icon-btn" id="searchBtn" title="Search chats (Ctrl+K)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></button>
               <input type="file" id="importFile" accept=".json,.jsonl,application/json" hidden>
+        <button class="icon-btn" id="findBtn" title="Find in conversation (Ctrl+F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h9M4 10.5h5M4 15h4"/><circle cx="15.5" cy="14" r="4"/><path d="m18.5 17 2.5 2.5"/></svg></button>
         <button class="icon-btn" id="importSession" title="Continue from a session file (.json / .jsonl)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4M12 15V4.5M8 8l4-4 4 4" /></svg></button>
       </div>
       <div class="header-title" id="headerTitleArea">
@@ -125,6 +126,14 @@
     </div>
     </header>
 
+    <div class="find-bar" id="findBar" hidden role="search">
+      <svg class="find-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+      <input id="findInput" type="text" placeholder="Find in conversation" autocomplete="off" spellcheck="false" aria-label="Find in conversation">
+      <span class="find-count" id="findCount"></span>
+      <button class="icon-btn" id="findPrev" title="Previous (Shift+Enter)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 14.5 5.5-5.5 5.5 5.5"/></svg></button>
+      <button class="icon-btn" id="findNext" title="Next (Enter)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/></svg></button>
+      <button class="icon-btn" id="findClose" title="Close (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg></button>
+    </div>
     <div id="chat">
       <div class="inner" id="log"></div>
     </div>
@@ -293,6 +302,7 @@
         <div class="set-nav-h">Settings</div>
         <button class="on" data-sec="general"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>General</button>
         <button data-sec="appearance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17" /><path fill="currentColor" stroke="none" d="M12 3.5a8.5 8.5 0 0 1 0 17z"/></svg>Appearance</button>
+        <button data-sec="security"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19 6v5.5c0 4.4-3 7.9-7 9.5-4-1.6-7-5.1-7-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg>Security</button>
         <button data-sec="usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" opacity=".35"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5"/><path d="M12 8v4l2.5 2"/></svg>Usage</button>
         <div class="set-nav-acc" id="accountSec" hidden>
           <div class="set-acc-card" id="who">
@@ -341,6 +351,52 @@
                 <option value="">Default</option>
               </select>
             </div>
+          </div>
+        </section>
+        <section class="set-sec" data-sec="security" hidden>
+          <h2>Security</h2>
+          <p class="set-sub">How Gemini Studio keeps you safe. These protections are always on.</p>
+          <h3>Protections</h3>
+          <p class="set-sec-desc">Built in, they cannot be turned off.</p>
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-label">
+                <span class="set-label-text">Link warnings</span>
+                <span class="set-desc">Links on a domain you have not trusted show a warning and ask before opening.</span>
+              </div>
+              <span class="sec-on">On</span>
+            </div>
+            <div class="set-row">
+              <div class="set-label">
+                <span class="set-label-text">No outside code</span>
+                <span class="set-desc">Scripts, styles and fonts are bundled with the app. The page cannot load anything from, or send anything to, other sites.</span>
+              </div>
+              <span class="sec-on">On</span>
+            </div>
+            <div class="set-row">
+              <div class="set-label">
+                <span class="set-label-text">Pictures from the web</span>
+                <span class="set-desc">Shown as links, never loaded: a remote picture could track you.</span>
+              </div>
+              <span class="sec-on">On</span>
+            </div>
+            <div class="set-row">
+              <div class="set-label">
+                <span class="set-label-text">This computer only</span>
+                <span class="set-desc">The server only answers this computer and refuses requests from other websites.</span>
+              </div>
+              <span class="sec-on">On</span>
+            </div>
+          </div>
+          <h3>Trusted domains</h3>
+          <p class="set-sec-desc">Links show a warning unless their domain is listed here. A domain also covers its subdomains. Kept in this browser only.</p>
+          <div class="set-card">
+            <div class="set-row td-add">
+              <input id="tdInput" type="text" placeholder="example.com" autocomplete="off" spellcheck="false" aria-label="Domain to trust">
+              <button class="set-reset glass-btn" id="tdAdd">Add</button>
+            </div>
+            <div class="td-error" id="tdError"></div>
+            <div id="tdList"></div>
           </div>
         </section>
         <section class="set-sec" data-sec="usage" hidden>
@@ -486,6 +542,8 @@
   </div>
 
   <script src="/js/core.js"></script>
+  <script src="/js/links.js"></script>
+  <script src="/js/find.js"></script>
   <script src="/js/appearance.js"></script>
   <script src="/js/settings.js"></script>
   <script src="/js/chat-ui.js"></script>

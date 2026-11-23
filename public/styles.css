@@ -8486,6 +8486,173 @@
       opacity: .85
     }
 
+    /* Jira's arrows fill their whole box, so they get a smaller box than the other link icons */
+    a.aref.jira .ai svg {
+      width: 12px;
+      height: 12px
+    }
+
+    a.aref.jira .ai {
+      margin-right: 5px
+    }
+
+    /* ---------- links on a domain that is not trusted: a warning sign after them ---------- */
+    a[data-lk="warn"]::after,
+    a[data-lk="bad"]::after {
+      content: "";
+      display: inline-block;
+      width: 13px;
+      height: 13px;
+      margin-left: 5px;
+      vertical-align: -2px;
+      background: no-repeat center / contain
+    }
+
+    a[data-lk="warn"]::after {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3.6 21.2 19.6H2.8z' fill='%23e8a33d' stroke='%23e8a33d' stroke-width='2.6' stroke-linejoin='round'/%3E%3Cpath d='M12 9.4v4.9' stroke='%2317171a' stroke-width='2.1' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='17' r='1.25' fill='%2317171a'/%3E%3C/svg%3E")
+    }
+
+    a[data-lk="bad"]::after {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3.6 21.2 19.6H2.8z' fill='%23ff6b6b' stroke='%23ff6b6b' stroke-width='2.6' stroke-linejoin='round'/%3E%3Cpath d='M12 9.4v4.9' stroke='%2317171a' stroke-width='2.1' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='17' r='1.25' fill='%2317171a'/%3E%3C/svg%3E")
+    }
+
+    /* the question before opening such a link */
+    .lk-modal { z-index: 60 }
+
+    .lk-dialog { width: 480px; height: auto }
+
+    .lk-title { display: flex; align-items: center; gap: 9px }
+
+    .lk-sign { flex: none; width: 20px; height: 20px }
+
+    .lk-sign svg { display: block; width: 100%; height: 100% }
+
+    .lk-url {
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--line2);
+      border-radius: 12px;
+      background: var(--surface2);
+      font: 12.5px/1.5 var(--mono-font);
+      color: var(--muted);
+      overflow-wrap: anywhere
+    }
+
+    .lk-url b { color: var(--text); font-weight: 400 }
+
+    /* the question: no line above the buttons, glass edge on them */
+    .lk-dialog .bot { border-top: 0; padding-top: 4px }
+
+    .lk-dialog .btn { box-shadow: var(--glass) }
+
+    .lk-dialog .btn.primary { box-shadow: none }
+
+    .lk-url.bad { border-color: color-mix(in srgb, #ff6b6b 55%, var(--line2)) }
+
+    .lk-flags { margin: 0 0 12px; padding-left: 18px; font-size: 12.5px; line-height: 1.6; color: #ff8a8a }
+
+    /* Settings -> Trusted domains */
+    .set-card .td-add { gap: 10px }
+
+    .td-add input {
+      flex: 1;
+      min-width: 0;
+      height: 32px;
+      padding: 0 14px;
+      border: 1px solid var(--line2);
+      border-radius: 999px;
+      background: var(--surface2);
+      color: var(--text);
+      font: inherit;
+      font-size: 13px
+    }
+
+    .td-error { padding: 0 16px; color: #ff8a8a; font-size: 12px }
+
+    .td-error:empty { display: none }
+
+    .td-name { font-family: var(--mono-font); font-size: 12.5px }
+
+    .td-empty { color: var(--muted); font-size: 12.5px }
+
+    /* ---------- find in conversation ---------- */
+    .find-bar {
+      position: absolute;
+      top: 58px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 12;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      width: min(460px, calc(100% - 32px));
+      height: 40px;
+      padding: 0 6px 0 12px;
+      border: 1px solid var(--line2);
+      border-radius: 999px;
+      background: var(--surface);
+      box-shadow: var(--glass), 0 10px 30px rgba(0, 0, 0, .35)
+    }
+
+    .find-bar[hidden] { display: none }
+
+    .find-ic { flex: none; width: 15px; height: 15px; color: var(--muted) }
+
+    .find-bar input {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      padding: 0 6px;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 13.5px
+    }
+
+    .find-count {
+      flex: none;
+      padding: 0 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap
+    }
+
+    .find-count.none { color: #ff8a8a }
+
+    .find-bar .icon-btn { width: 28px; height: 28px; border-radius: 999px }
+
+    .find-bar .icon-btn svg { width: 15px; height: 15px }
+
+    ::highlight(find-hit) {
+      background-color: rgba(232, 163, 61, .32);
+      color: inherit
+    }
+
+    ::highlight(find-cur) {
+      background-color: #e8a33d;
+      color: #17171a
+    }
+
+    /* the small buttons in Settings (Refresh, Add, Remove, the theme switch) get the glass edge too */
+    .set-dialog .set-reset,
+    .set-dialog .seg {
+      box-shadow: var(--glass)
+    }
+
+    /* Settings -> Security: "On" next to each protection */
+    .sec-on {
+      flex: none;
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--ok, #34c77b) 16%, transparent);
+      color: var(--ok, #34c77b);
+      font-size: 12px;
+      font-weight: 500
+    }
+
     /* tight window: the panel floats over the chat, so it keeps a shadow */
     @media (min-width:761px) and (max-width:1100px) {
       #diffPanel {
