@@ -8941,3 +8941,48 @@
     .hl-auto .hljs-deletion { color: var(--git-del); }
     /* Robot Framework: the names of tests and keywords (first cell, not indented) are bold, in the full text colour */
     .hl-auto .hljs-title.robot_ { color: var(--text); font-weight: 430; }
+
+    /* ---------- the files / changes panel keeps the same rounded corners as the rest ---------- */
+    /* tight window (it floats over the chat): an inset rounded card, not a strip glued to the window edge */
+    @media (min-width:761px) and (max-width:1100px) {
+      #diffPanel,
+      #diffPanel.files,
+      body.panel-max #diffPanel {
+        inset: 8px 8px 8px auto;
+        margin: 0;
+        border: 1px solid var(--line2);
+        border-radius: 14px;
+        overflow: hidden;
+        width: min(var(--diff-w, 440px), calc(100vw - 16px));
+        box-shadow: var(--glass), -10px 0 36px rgba(0, 0, 0, .4)
+      }
+
+      #diffPanel.files {
+        width: min(var(--files-w, 780px), calc(100vw - 16px))
+      }
+
+      body.panel-max #diffPanel {
+        inset: 8px;
+        width: auto
+      }
+    }
+
+    /* wide window (it sits beside the chat): the same radius as the chat card on both halves */
+    @media (min-width:1101px) {
+      body:has(#diffPanel.open):not(.panel-max) main {
+        border-radius: 12px 0 0 12px
+      }
+
+      body:has(#diffPanel.open):not(.panel-max) #diffPanel {
+        border-radius: 0 12px 12px 0
+      }
+
+      body:has(#diffPanel.open):not(.panel-max) #diffPanel .files-body,
+      body:has(#diffPanel.open):not(.panel-max) #diffPanel .diff-body {
+        border-radius: 0 0 11px 0
+      }
+
+      body.panel-max #diffPanel {
+        border-radius: 12px
+      }
+    }
