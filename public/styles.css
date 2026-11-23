@@ -8653,6 +8653,90 @@
       font-weight: 500
     }
 
+    /* ---------- what's new ---------- */
+    .wn-modal { z-index: 70 }
+
+    .wn-dialog {
+      position: relative;
+      overflow: hidden;
+      width: min(1040px, calc(100vw - 48px));
+      height: auto;
+      max-height: 86vh
+    }
+
+    /* a glow of the accent colour from the top left corner */
+    .wn-dialog::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse 70% 65% at 0 0, color-mix(in srgb, var(--accent) 34%, transparent), transparent 70%);
+      animation: wn-breathe 7s ease-in-out infinite
+    }
+
+    @keyframes wn-breathe {
+      0%, 100% { opacity: 1 }
+      50% { opacity: .72 }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .wn-dialog::before { animation: none }
+    }
+
+    .wn-head, .wn-body, .wn-dialog .bot { position: relative }
+
+    .wn-head { padding: 28px 30px 8px }
+
+    .wn-head h3 { margin: 0 0 6px; font-size: 26px; font-weight: 480; letter-spacing: -.01em }
+
+    .wn-head p { margin: 0; color: var(--text2); font-size: 14px }
+
+    .wn-body { flex: 1; overflow: auto; padding: 4px 30px 14px }
+
+    .wn-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 4px 48px;
+      align-items: start
+    }
+
+    .wn-sec { margin: 18px 0 10px; font-size: 12px; font-weight: 460; letter-spacing: .04em; text-transform: uppercase; color: var(--muted) }
+
+    .wn-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 13px }
+
+    .wn-list li { display: grid; gap: 2px; padding-left: 14px; position: relative }
+
+    .wn-list li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: .62em;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent)
+    }
+
+    .wn-t { color: var(--text); font-size: 13.5px; font-weight: 460 }
+
+    .wn-d { color: var(--text2); font-size: 13px; line-height: 1.5 }
+
+    .wn-dialog .bot { border-top: 0; padding: 10px 22px 18px; align-items: center }
+
+    /* "Got it": a glass button */
+    .wn-ok {
+      height: 34px;
+      padding: 0 22px;
+      border: 1px solid var(--line2);
+      background: color-mix(in srgb, var(--text) 9%, transparent);
+      color: var(--text);
+      font-weight: 500;
+      box-shadow: var(--glass);
+      backdrop-filter: blur(8px)
+    }
+
+    .wn-ok:hover { background: color-mix(in srgb, var(--text) 16%, transparent); color: var(--text) }
+
     /* tight window: the panel floats over the chat, so it keeps a shadow */
     @media (min-width:761px) and (max-width:1100px) {
       #diffPanel {
