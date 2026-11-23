@@ -49,3 +49,11 @@ After updating the files, stop it and start it again (the page itself only needs
 - **Robot Framework** files (`.robot`, `.resource`) get syntax highlighting (also in diffs and in ```` ```robot ```` code blocks, light and dark)
   and the Robot Framework file icon from [vscode-icons](https://github.com/vscode-icons/vscode-icons) (CC BY-SA 4.0).
 - If the Gemini CLI is installed somewhere unusual, set `GEMINI_JS` to the path of its `gemini.js`.
+
+## Fonts
+
+Google Sans Flex, Inter and JetBrains Mono are bundled in `public/fonts/` (SIL Open Font License 1.1), so the default look needs no network. Picking any other font in Settings -> Appearance loads it from Google Fonts.
+
+## Security: no outside code
+
+The page loads nothing from the internet. marked, DOMPurify, KaTeX and highlight.js are bundled in `public/vendor/` (unmodified copies from the official npm packages; `public/vendor/CHECKSUMS.json` has their versions and SHA-256 hashes), and the fonts are in `public/fonts/`. A Content-Security-Policy (in `index.html` and as a header from `server.js`) only allows scripts, styles, fonts, images and requests from this server, and the server only listens on 127.0.0.1. Scripts may only come from this server (no inline scripts). Pictures from the web in a reply are shown as links. To update a library, copy the new file from its npm package, run `npm audit` on it first and update the checksum.

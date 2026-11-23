@@ -1,0 +1,3 @@
+# keep the bundled third-party files byte-for-byte (their SHA-256 hashes are in public/vendor/CHECKSUMS.json)
+public/vendor/** -text
+public/fonts/** -text
