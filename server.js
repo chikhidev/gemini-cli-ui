@@ -694,8 +694,21 @@ function saveUpload({ name, data }) {
 // ---------- quota ----------
 // Same numbers as the CLI's "/model manage": Code Assist's retrieveUserQuota, using the CLI's own
 // OAuth credentials (~/.gemini/oauth_creds.json) and the project from GOOGLE_CLOUD_PROJECT.
-const OAUTH_CLIENT_ID = 'REMOVED';
-const OAUTH_CLIENT_SECRET = 'REMOVED';
+// The sign-in details of the Gemini CLI itself (its OAuth client, which belongs to the CLI, not to you) are NOT kept in
+// this project: they are read from the installed CLI when a token refresh is needed.
+let cliOAuth = null;
+function cliOAuthClient() {
+  if (cliOAuth) return cliOAuth;
+  try {
+    const bundle = path.dirname(GEMINI_PRE[0] || '');
+    for (const f of fs.readdirSync(bundle).filter((n) => n.endsWith('.js'))) {
+      const text = fs.readFileSync(path.join(bundle, f), 'utf8');
+      const id = text.match(/OAUTH_CLIENT_ID = "([^"]+)"/), secret = text.match(/OAUTH_CLIENT_SECRET = "([^"]+)"/);
+      if (id && secret) return (cliOAuth = { id: id[1], secret: secret[1] });
+    }
+  } catch {}
+  throw new Error('Could not read the Gemini CLI sign-in details (is the CLI installed?)');
+}
 const CODE_ASSIST = 'https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota';
 let tokenCache = null;  // { token, expiry }
 let quotaCache = null;  // { at, data }
@@ -709,8 +722,9 @@ async function accessToken() {
     return tokenCache.token;
   }
   if (!creds.refresh_token) throw new Error('Not signed in');
+  const client = cliOAuthClient();
   const body = new URLSearchParams({
-    client_id: OAUTH_CLIENT_ID, client_secret: OAUTH_CLIENT_SECRET,
+    client_id: client.id, client_secret: client.secret,
     refresh_token: creds.refresh_token, grant_type: 'refresh_token',
   });
   const res = await fetch('https://oauth2.googleapis.com/token', {
