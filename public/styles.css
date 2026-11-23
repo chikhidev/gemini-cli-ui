@@ -8977,12 +8977,19 @@
         border-radius: 0 12px 12px 0
       }
 
+      /* what is inside the panel is cut to its rounded right-hand corners (no hard edges there) */
       body:has(#diffPanel.open):not(.panel-max) #diffPanel .files-body,
       body:has(#diffPanel.open):not(.panel-max) #diffPanel .diff-body {
-        border-radius: 0 0 11px 0
+        border-radius: 0 11px 11px 0;
+        overflow: hidden
       }
 
       body.panel-max #diffPanel {
         border-radius: 12px
       }
+    }
+
+    /* the chat's scrollbar ends where the message box starts, not at the bottom of the window */
+    main:not(.fresh) #chat::-webkit-scrollbar-track {
+      margin-bottom: max(0px, calc(var(--composer-h, 140px) - 22px))
     }
