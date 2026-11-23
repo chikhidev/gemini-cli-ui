@@ -81,7 +81,9 @@ function summarize(file, cwd) {
   const userTurns = msgs.map((m) => (m.type === 'user' ? userText(m) : '')).filter((t) => t && !isContext(t));
   // A repaired/partial session may have no user text left; fall back to Gemini's first reply.
   const firstGemini = msgs.map((m) => (m.type === 'gemini' && typeof m.content === 'string' ? m.content.trim() : '')).find(Boolean);
-  const firstUser = userTurns[0] || firstGemini;
+  // A hook's <hook_context> block is not what was asked: the chat shows it as a tag, the title leaves it out.
+  const firstUser = (userTurns[0] || '').replace(/<hook_context>[\s\S]*?<\/hook_context>\s*/g, '').trim()
+    || userTurns[0] || firstGemini;
   if (!firstUser) return null; // empty session, nothing to show
   // Drop leading @"path" attachment references so the title shows what was actually asked.
   const titleText = (s.summary || firstUser).replace(/^(?:@"[^"]+"|@\S+)(?:\s+(?:@"[^"]+"|@\S+))*\s*/, '').trim()

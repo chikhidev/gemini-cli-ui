@@ -205,13 +205,55 @@ function findFiles(cwd, q) {
   return { files: out, truncated };
 }
 
-// Which of these paths (absolute or relative to cwd) are real files or folders inside the working folder.
+// Every file and folder under the working folder ("/"-separated relative paths, nearest the top first), for finding
+// a name that a reply gave without its full path. Skips the usual heavy folders, stops at 40000 entries and is
+// kept for 10 seconds.
+const treeIndexCache = new Map();
+function treeIndex(cwd) {
+  const root = path.resolve(cwd || '');
+  const hit = treeIndexCache.get(root);
+  if (hit && Date.now() - hit.at < 10000) return hit.list;
+  const list = [], queue = [''];
+  let seen = 0;
+  while (queue.length) {
+    const rel = queue.shift();
+    let entries;
+    try { entries = fs.readdirSync(path.join(root, rel), { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      if (++seen > 40000) { queue.length = 0; break; }
+      let dir = false;
+      try { dir = e.isDirectory(); } catch {}
+      if (dir && SKIP_DIRS.has(e.name)) continue;
+      const r = rel ? rel + '/' + e.name : e.name;
+      list.push({ rel: r, low: r.toLowerCase(), dir });
+      if (dir) queue.push(r);
+    }
+  }
+  treeIndexCache.set(root, { at: Date.now(), list });
+  return list;
+}
+
+// Which of these paths (absolute or relative to cwd) are real files or folders inside the working folder. A name
+// that is not at that path is looked for further down: "retailers_vac.json" finds OmsLib/envData/retailers_vac.json,
+// and "envData/retailers_vac.json" finds it too. With several matches the one nearest the top is used (the answer
+// says how many there were).
 function statPaths(cwd, paths) {
-  const out = {};
+  const out = {}, missing = [];
   for (const p of (paths || []).slice(0, 300)) {
     const abs = resolveIn(cwd, p);
     if (!readable(cwd, abs)) continue;
-    try { const st = fs.statSync(abs); out[p] = { path: abs, dir: st.isDirectory() }; } catch {}
+    try { const st = fs.statSync(abs); out[p] = { path: abs, dir: st.isDirectory() }; } catch { missing.push(p); }
+  }
+  const seekable = missing.map((p) => [p, String(p).replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '').toLowerCase()])
+    .filter(([, w]) => w && !w.startsWith('/') && !/^[a-z]:/.test(w) && !w.split('/').includes('..'));
+  if (seekable.length && cwd) {
+    const root = path.resolve(cwd), index = treeIndex(cwd);
+    for (const [p, want] of seekable) {
+      const hits = index.filter((e) => e.low === want || e.low.endsWith('/' + want));
+      if (!hits.length) continue;
+      const abs = path.join(root, hits[0].rel);
+      if (readable(cwd, abs)) out[p] = { path: abs, dir: hits[0].dir, rel: hits[0].rel, matches: hits.length };
+    }
   }
   return out;
 }
@@ -281,6 +323,19 @@ function git(cwd, args, maxBuffer = 8 * 1024 * 1024) {
 function isRepo(cwd) {
   try { return git(cwd, ['rev-parse', '--is-inside-work-tree']).trim() === 'true'; } catch { return false; }
 }
+function gitBranch(cwd) {
+  if (!cwd) return '';
+  try {
+    let b = git(cwd, ['branch', '--show-current']).trim();
+    if (!b) {
+      const h = git(cwd, ['rev-parse', '--short', 'HEAD']).trim();
+      if (h) b = `(${h})`;
+    }
+    return b;
+  } catch {
+    return '';
+  }
+}
 const STATUS_LABEL = { M: 'modified', A: 'added', D: 'deleted', R: 'renamed', C: 'copied', U: 'conflicted', '?': 'new' };
 
 function changes(cwd) {
@@ -321,7 +376,7 @@ function changes(cwd) {
     }
     files.push({ path: p, status: STATUS_LABEL[code] || code, ...(stat || { added: 0, removed: 0 }) });
   }
-  return { repo: true, files };
+  return { repo: true, files, branch: gitBranch(cwd) };
 }
 
 function fileDiff(cwd, file) {
@@ -859,7 +914,7 @@ async function chat(req, res) {
     }
     // Skip known startup noise; surface real errors.
     // Also drop Node warnings, and tool errors — those already show on the failed tool card.
-    const NOISE = /256-color|Ripgrep is not available|\[STARTUP\]|reset\)\.?$|YOLO mode is enabled|DeprecationWarning|--trace-deprecation|--trace-warnings|^Error executing tool |^Tool with name ".*" is already registered\. Overwriting\.?$|Skill conflict detected|overriding the same skill from/;
+    const NOISE = /256-color|Ripgrep is not available|\[STARTUP\]|reset\)\.?$|YOLO mode is enabled|DeprecationWarning|--trace-deprecation|--trace-warnings|^Error executing tool |^Tool with name ".*" is already registered\. Overwriting\.?$|Skill conflict detected|overriding the same skill from|Warning: Could not read directory.*ENOENT.*scandir/;
     const withoutNodeWarnings = text.replace(/\(node:\d+\) [^\n]*Warning:[\s\S]*?warning was created\)/g, '');
     const useful = withoutNodeWarnings.split(/\r?\n/).filter((l) => l.trim() && !NOISE.test(l));
     if (useful.length) send({ type: 'stderr', content: useful.join('\n') });
@@ -976,6 +1031,7 @@ http.createServer(async (req, res) => {
     if (url.pathname === '/api/search') return json(res, 200, history.search(url.searchParams.get('q')));
     if (url.pathname === '/api/context') return json(res, 200, history.contextSize(url.searchParams.get('id')) || {});
     if (url.pathname === '/api/changes') return json(res, 200, changes(url.searchParams.get('cwd')));
+    if (url.pathname === '/api/branch') return json(res, 200, { branch: gitBranch(url.searchParams.get('cwd')) });
     if (url.pathname === '/api/diff') return json(res, 200, fileDiff(url.searchParams.get('cwd'), url.searchParams.get('path')));
     if (url.pathname === '/api/dirs') return json(res, 200, listDirs(url.searchParams.get('path')));
     if (url.pathname === '/api/tree') return json(res, 200, treeDir(url.searchParams.get('cwd'), url.searchParams.get('path')));
@@ -1005,7 +1061,10 @@ http.createServer(async (req, res) => {
       const { cwd, path: p, how } = await readBody(req);
       return json(res, 200, openPath(cwd, p, how));
     }
-    if (url.pathname === '/api/info') return json(res, 200, { home: os.homedir(), cwd: process.cwd(), gemini: GEMINI_PRE[0] || GEMINI_BIN, vscode: !!findVSCode(), platform: process.platform, user: currentUser() });
+    if (url.pathname === '/api/info') {
+      const cwd = url.searchParams.get('cwd') || process.cwd();
+      return json(res, 200, { home: os.homedir(), cwd: process.cwd(), gemini: GEMINI_PRE[0] || GEMINI_BIN, vscode: !!findVSCode(), platform: process.platform, user: currentUser(), branch: gitBranch(cwd) });
+    }
 
     const file = path.join(PUBLIC, url.pathname === '/' ? 'index.html' : path.normalize(url.pathname));
     if (!file.startsWith(PUBLIC) || !fs.existsSync(file)) { res.writeHead(404); return res.end('Not found'); }

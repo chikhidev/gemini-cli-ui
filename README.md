@@ -46,4 +46,6 @@ After updating the files, stop it and start it again (the page itself only needs
   `~/.gemini/scratch` (when they exist). Allowed folders are added to its workspace for that project; change it in
   Settings → Folder access. Answers are kept in `~/.gemini-ui/folder-access.json`.
 - On Windows the folder button and the attach button open the real Windows dialogs (elsewhere, the in-page picker).
+- **Robot Framework** files (`.robot`, `.resource`) get syntax highlighting (also in diffs and in ```` ```robot ```` code blocks, light and dark)
+  and the Robot Framework file icon from [vscode-icons](https://github.com/vscode-icons/vscode-icons) (CC BY-SA 4.0).
 - If the Gemini CLI is installed somewhere unusual, set `GEMINI_JS` to the path of its `gemini.js`.

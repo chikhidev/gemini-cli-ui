@@ -9,14 +9,56 @@
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%234992ea' d='M12 1c.6 5.8 5.2 10.4 11 11-5.8.6-10.4 5.2-11 11-.6-5.8-5.2-10.4-11-11C6.8 11.4 11.4 6.8 12 1z'/></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@100..700&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css"
     id="hlTheme">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>
+    // Robot Framework for highlight.js. Every rule looks at one line only, so it also works on the single lines of a
+    // diff and on the pieces of a chat code block. Robot is column based: cells are separated by two or more spaces
+    // (or a tab); the first cell of an indented line is a keyword call, of a column-0 line a test / keyword name.
+    function robotLanguage(hljs) {
+      // letters match in either case ("Suite Setup", "suite setup"), the way Robot reads them
+      const ci = (w) => w.replace(/[a-z]/gi, (ch) => '[' + ch.toUpperCase() + ch.toLowerCase() + ']');
+      const list = (names) => names.map(ci).join('|');
+      const CELL_END = /(?=[ \t]{2,}|\t|$)/;
+      const SEPARATOR = '(?:[ \\t]{2,}|\\t)';
+      const VARIABLE = {className: 'variable', begin: /[$@&%]\{/, end: /\}/, contains: ['self'], relevance: 0};
+      const CONTROL = 'IF|ELSE IF|ELSE|END|FOR|WHILE|TRY|EXCEPT|FINALLY|RETURN|BREAK|CONTINUE|VAR|GROUP';
+      const NOT_FIRST = '[^\\s#.$@&%\\[|]';       // what the first cell of a keyword call cannot start with
+      return {
+        name: 'Robot Framework',
+        aliases: ['robotframework', 'resource'],
+        contains: [
+          // *** Settings ***, *** Test Cases ***, ...
+          {className: 'section', begin: new RegExp('^\\*+[ \\t]*(?:' + list(['Settings?', 'Variables?', 'Test Cases?', 'Tasks?', 'Keywords?', 'Comments?']) + ')[ \\t]*\\**[ \\t]*$')},
+          hljs.COMMENT(/^[ \t]*#/, /$/),
+          hljs.COMMENT(/(?:[ \t]{2,}|\t)#/, /$/),
+          // Library, Resource, Suite Setup, ... at the start of a line
+          {className: 'keyword', begin: new RegExp('^(?:' + list(['Library', 'Resource', 'Variables', 'Documentation', 'Metadata', 'Suite Setup', 'Suite Teardown', 'Test Setup', 'Test Teardown', 'Test Template', 'Test Timeout', 'Test Tags', 'Force Tags', 'Default Tags', 'Keyword Tags', 'Task Setup', 'Task Teardown', 'Task Template', 'Task Timeout', 'Task Tags']) + ')(?=[ \\t]{2,}|\\t|$)')},
+          // [Documentation], [Tags], [Arguments], ...
+          {className: 'keyword', begin: new RegExp('\\[(?:' + list(['Documentation', 'Tags', 'Setup', 'Teardown', 'Template', 'Timeout', 'Arguments', 'Return']) + ')\\]')},
+          // the name of a test case / keyword / task (not indented)
+          {className: 'title function_ robot_', begin: /^(?![ \t#*.|$@&%])\S/, end: CELL_END, contains: [VARIABLE]},
+          // ... (a line continues the one above)
+          {className: 'operator', begin: /(?<=^[ \t]+)\.\.\.(?=[ \t]|$)/},
+          // IF / ELSE / END / FOR / WHILE / TRY ... as the first cell, and IN / IN RANGE ... in a FOR line
+          {className: 'keyword', begin: new RegExp('(?<=^[ \\t]+)(?:' + CONTROL + ')(?=[ \\t]{2,}|\\t|$)')},
+          {className: 'keyword', begin: /(?<=[ \t]{2}|\t)IN(?: RANGE| ENUMERATE| ZIP)?(?=[ \t]{2,}|\t|$)/},
+          // the keyword being called: first cell of an indented line, or the one after "${x}=" assignments
+          {className: 'built_in', begin: new RegExp('(?<=^[ \\t]+(?:[$@&]\\{[^}\\n]*\\}[ \\t]*=?' + SEPARATOR + ')+)' + NOT_FIRST), end: CELL_END, contains: [VARIABLE]},
+          {className: 'built_in', begin: new RegExp('(?<=^[ \\t]+)(?!(?:' + CONTROL + ')(?:[ \\t]{2,}|\\t|$))' + NOT_FIRST), end: CELL_END, contains: [VARIABLE]},
+          VARIABLE,
+          {className: 'number', begin: /\b\d+(?:\.\d+)?(?=[ \t]|$)/, relevance: 0},
+        ],
+      };
+    }
+    if (window.hljs) hljs.registerLanguage('robot', robotLanguage);
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
   <style>
     :root {
@@ -31,25 +73,35 @@
       --accent-glow: color-mix(in srgb, var(--accent) 9%, transparent);
       --accent-mark: color-mix(in srgb, var(--accent) 30%, transparent);
       --accent-fg: #fff;
-      --bg: #191919;
-      --surface: #202020;          /* cards, the message box, sidebar: a step lighter than the page, so they sit on it */
-      --surface2: #262626;
-      --hover: #2a2a2a;            /* must still show on --surface */
-      --line: #2e2e2e;
-      --line2: #383838;
-      --text: #fff;
-      --text2: #c8c8c8;
-      --muted: #7a7a7a;
+      --bg: #101010;               /* the content surface: chat, open files */
+      --surface: #1a1a1a;          /* the chrome around it: sidebar, top strip */
+      --surface2: #1f1f1f;
+      --hover: #232323;            /* must still show on --surface */
+      --line: #222222;
+      --line2: #2c2c2c;
+      --text: #ececec;
+      --text2: #c6c6c6;
+      --muted: #8a8a8a;
       --faint: #3a3a3a;
-      --code: #202020;             /* code blocks match the cards */
-      /* the message box: lighter and crisper than the cards, so it reads as the place to type */
-      --composer-bg: #2e2e2e;
-      --composer-line: #5c5c5c;
-      --composer-ph: #ababab;      /* placeholder */
-      --composer-ic: #bbbbbb;      /* + and mic */
-      --composer-hover: #3a3a3a;
-      --send-off-bg: #444444;      /* send button while there is nothing to send */
-      --send-off-fg: #999999;
+      --code: #151515;
+      --gutter: #4d4c46;           /* line numbers */
+      /* the message box */
+      --composer-bg: #1d1d1d;
+      --composer-line: #282828;
+      --composer-ph: #7f7f7f;      /* placeholder */
+      --composer-ic: #a6a6a6;      /* + and mic */
+      --composer-hover: #262626;
+      --send-bg: #cfcfcf;
+      --send-fg: #1d1d1d;
+      --send-off-bg: #7d7d7d;      /* send button while there is nothing to send */
+      --send-off-fg: #1d1d1d;
+      /* sidebar */
+      --side-btn: #252525;         /* New chat */
+      --side-btn-line: #2c2c2c;
+      --side-active: #2a2a2a;      /* the open chat */
+      /* your messages */
+      --bubble: #1b1b1b;
+      --bubble-line: #262626;
       --ease: cubic-bezier(.22, 1, .36, 1);
       --ui-font: Inter, system-ui, sans-serif;
       --mono-font: "JetBrains Mono", ui-monospace, monospace;
@@ -59,18 +111,22 @@
 
     /* Settings → Darker background (dark mode only): every surface a step darker, same contrast between them */
     :root[data-darker]:not([data-theme="light"]) {
-      --bg: #0d0d0d;
-      --surface: #151515;
-      --surface2: #1b1b1b;
-      --hover: #202020;
-      --line: #232323;
-      --line2: #2d2d2d;
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --surface2: #1a1a1a;
+      --hover: #1e1e1e;
+      --line: #1c1c1c;
+      --line2: #262626;
       --faint: #2d2d2d;
-      --code: #151515;
-      --composer-bg: #222222;
-      --composer-line: #4f4f4f;
-      --composer-hover: #2e2e2e;
-      --send-off-bg: #3a3a3a;
+      --code: #101010;
+      --composer-bg: #181818;
+      --composer-line: #232323;
+      --composer-hover: #222222;
+      --side-btn: #1f1f1f;
+      --side-btn-line: #262626;
+      --side-active: #242424;
+      --bubble: #161616;
+      --bubble-line: #202020;
     }
 
     :root[data-theme="light"] {
@@ -92,6 +148,14 @@
       --composer-hover: #ececec;
       --send-off-bg: #e2e2e2;
       --send-off-fg: #a0a0a0;
+      --send-bg: #1d1d1d;
+      --send-fg: #fff;
+      --gutter: #b0b0b0;
+      --side-btn: #ffffff;
+      --side-btn-line: #dedede;
+      --side-active: #e8e8e8;
+      --bubble: #efefef;
+      --bubble-line: #e3e3e3;
     }
 
     /* a display rule must never beat the hidden attribute */
@@ -359,7 +423,7 @@
 
     #newChat {
       color: var(--text);
-      font-weight: 500
+      font-weight: 350
     }
 
     /* the logo's colours, shared by the "Gemini" word and the working logo */
@@ -391,7 +455,7 @@
     .who-name {
       color: var(--text);
       font-size: 13px;
-      font-weight: 500;
+      font-weight: 350;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap
@@ -412,7 +476,7 @@
     .label {
       padding: 0 20px 6px;
       font-size: 10.5px;
-      font-weight: 600;
+      font-weight: 430;
       letter-spacing: .06em;
       text-transform: uppercase;
       color: var(--muted)
@@ -451,7 +515,7 @@
 
     .sess .t strong,
     .sess .t b {
-      font-weight: 600
+      font-weight: 430
     }
 
     .sess .t:has(input) {
@@ -620,7 +684,7 @@
       cursor: pointer;
       color: var(--muted);
       font-size: 11.5px;
-      font-weight: 600;
+      font-weight: 430;
       transition: color .2s, background .15s
     }
 
@@ -653,7 +717,7 @@
     }
 
     .g-count {
-      font-weight: 400;
+      font-weight: 270;
       opacity: .6;
       margin-right: auto
     }
@@ -865,11 +929,6 @@
       padding-right: 14px !important
     }
 
-    /* the row under the search box only holds the "N automated hidden" toggle now */
-    .label:has(> .auto-toggle[hidden]) {
-      display: none
-    }
-
     .label {
       display: flex;
       justify-content: flex-end
@@ -877,7 +936,7 @@
 
     .auto-toggle {
       font-size: 10.5px;
-      font-weight: 500;
+      font-weight: 350;
       letter-spacing: 0;
       text-transform: none;
       color: var(--muted);
@@ -921,10 +980,42 @@
     }
 
     header {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      z-index: 3
+      z-index: 3;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+      background: var(--bg);
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13.5px;
+      font-weight: 350;
+      color: var(--text);
+      min-width: 0;
+    }
+
+    .header-title .cwd-text {
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-title .sep {
+      color: var(--line2);
+      flex-shrink: 0;
+    }
+
+    .header-title .title-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* buttons floating over the chat get a solid backing, so scrolled text never hides them */
@@ -947,7 +1038,7 @@
       border-radius: 7px;
       padding: 5px 11px;
       font-size: 12.5px;
-      font-weight: 500;
+      font-weight: 350;
       color: var(--text2);
       transition: all .2s var(--ease)
     }
@@ -992,7 +1083,7 @@
       background: var(--surface2);
       color: var(--text2);
       font-size: 12px;
-      font-weight: 500;
+      font-weight: 350;
       max-width: 100%;
       transition: background .2s var(--ease), color .2s
     }
@@ -1045,7 +1136,7 @@
     .pill.locked .v::after {
       content: " · locked";
       color: var(--muted);
-      font-weight: 400
+      font-weight: 270
     }
 
     .pill.icon {
@@ -1151,7 +1242,7 @@
 
     .empty h1 {
       font-size: 34px;
-      font-weight: 600;
+      font-weight: 430;
       letter-spacing: -.03em;
       margin: 0 0 6px;
     }
@@ -1198,6 +1289,17 @@
 
     .msg {
       margin: 0 0 28px;
+    }
+
+    /* above the first built turn of a long chat: the earlier ones load as you scroll up to it */
+    .older-turns {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 0 0 28px;
+      color: var(--muted);
+      font-size: 12px
     }
 
     .msg.user {
@@ -1277,6 +1379,18 @@
       white-space: pre-wrap;
       word-wrap: break-word;
       position: relative
+    }
+
+    /* user message skeleton animation during 'sending' phase */
+    .msg.user.sending .bubble {
+      background: linear-gradient(90deg, var(--surface2) 25%, var(--line2) 50%, var(--surface2) 75%);
+      background-size: 200% 100%;
+      animation: skeletonPulse 3s infinite linear;
+      color: color-mix(in srgb, var(--text) 40%, transparent);
+    }
+    @keyframes skeletonPulse {
+      0% { background-position: 200% 0 }
+      100% { background-position: -200% 0 }
     }
 
     /* long messages are clamped, with a fade and an arrow to open them */
@@ -1482,7 +1596,7 @@
       gap: 10px;
       height: 26px;
       font-size: 14.5px;
-      font-weight: 500;
+      font-weight: 350;
     }
 
     .shimmer {
@@ -1496,7 +1610,7 @@
 
     .thinking .sub {
       color: var(--muted);
-      font-weight: 400;
+      font-weight: 270;
       font-family: var(--mono-font);
       font-size: 12px;
       max-width: 340px;
@@ -1536,7 +1650,7 @@
     .md h3 {
       letter-spacing: -.02em;
       line-height: 1.3;
-      font-weight: 600;
+      font-weight: 430;
       margin: 1.4em 0 .5em
     }
 
@@ -1562,12 +1676,23 @@
       margin: .25em 0
     }
 
+    /* "Done:", "Next action:"… before a list (see markLabels) */
+    .md p.md-label {
+      font-weight: 460;
+      color: var(--text);
+      margin: 1.2em 0 .3em
+    }
+
+    .md p.md-label:first-child {
+      margin-top: 0
+    }
+
     .md li::marker {
       color: var(--muted)
     }
 
     .md strong {
-      font-weight: 500
+      font-weight: 350
     }
 
     .md .katex {
@@ -1658,7 +1783,7 @@
     }
 
     .md th {
-      font-weight: 600;
+      font-weight: 430;
       background: var(--surface2)
     }
 
@@ -1765,7 +1890,7 @@
 
     .tbl-head b {
       font-size: 13.5px;
-      font-weight: 600
+      font-weight: 430
     }
 
     .tbl-head .meta {
@@ -1856,7 +1981,7 @@
 
     .tools-head .lead {
       color: var(--text2);
-      font-weight: 500;
+      font-weight: 350;
       margin-right: 2px
     }
 
@@ -1872,7 +1997,7 @@
     }
 
     .tools-head .ti b {
-      font-weight: 500;
+      font-weight: 350;
       font-size: 12px;
       font-variant-numeric: tabular-nums
     }
@@ -2112,7 +2237,7 @@
 
     .tool-sec .lbl {
       font-size: 10.5px;
-      font-weight: 600;
+      font-weight: 430;
       letter-spacing: .05em;
       text-transform: uppercase;
       color: var(--muted);
@@ -2125,7 +2250,7 @@
     .tool-sec .lbl button {
       margin-left: auto;
       font-size: 11px;
-      font-weight: 500;
+      font-weight: 350;
       letter-spacing: 0;
       text-transform: none;
       color: var(--muted);
@@ -2227,7 +2352,7 @@
     }
 
     .auth-title {
-      font-weight: 600;
+      font-weight: 430;
       margin-bottom: 4px
     }
 
@@ -2399,18 +2524,13 @@
     }
 
     main:not(.fresh) .composer-wrap {
-      position: absolute;
-      left: 0;
-      right: 12px;                 /* leave the chat's scrollbar visible */
-      bottom: 0;
-      z-index: 2;
-      padding: 14px 24px 34px 36px;
-      background: var(--bg)
+      padding: 14px 24px 34px 24px;
+      background: var(--bg);
+      flex-shrink: 0;
     }
 
-    /* the last message can scroll up clear of the floating box (its height is measured into --composer-h) */
     main:not(.fresh) #chat .inner {
-      padding-bottom: calc(var(--composer-h, 140px) + 20px)
+      padding-bottom: 20px;
     }
 
     .composer {
@@ -2529,6 +2649,10 @@
 
     textarea::placeholder {
       color: var(--muted)
+    }
+
+    #input {
+      overflow-y: hidden   /* autosize() turns the scrollbar on only for long text */
     }
 
     .send {
@@ -2686,7 +2810,7 @@
     .dialog h3 {
       margin: 0 0 8px 4px;
       font-size: 14px;
-      font-weight: 600
+      font-weight: 430
     }
 
     .crumb {
@@ -2763,28 +2887,51 @@
     }
 
     .btn {
-      border-radius: 9px;
-      padding: 8px 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 30px;
+      padding: 0 16px;
+      border-radius: 999px;
+      border: 0;
+      background: #222222;
+      color: var(--text2);
       font-size: 13px;
       font-weight: 500;
-      border: 1px solid var(--line2);
-      transition: all .2s var(--ease)
+      cursor: pointer;
+      box-shadow: none;
+      transition: background .2s var(--ease), color .2s var(--ease)
     }
 
     .btn:hover {
-      border-color: var(--text)
+      background: #2a2a2a;
+      color: var(--text)
     }
 
     .btn.primary {
       background: var(--text);
       color: var(--bg);
-      border-color: var(--text)
+      font-weight: 600
     }
 
     .btn.primary:hover {
-      background: var(--accent-grad);
-      border-color: var(--accent);
+      background: var(--accent);
       color: #fff
+    }
+
+    :root[data-theme="light"] .btn {
+      background: var(--surface2);
+      color: var(--text2)
+    }
+
+    :root[data-theme="light"] .btn:hover {
+      background: var(--hover);
+      color: var(--text)
+    }
+
+    :root[data-theme="light"] .btn.primary {
+      background: var(--text);
+      color: var(--bg)
     }
 
     /* while a Windows dialog is open */
@@ -2890,16 +3037,35 @@
     }
 
     .set-reset {
-      padding: 3px 9px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 30px;
+      padding: 0 14px;
+      border: 0;
       border-radius: 999px;
-      border: 1px solid var(--line2);
-      color: var(--muted);
-      font-size: 11.5px
+      background: #222222;
+      color: var(--text2);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: none;
+      transition: background .2s var(--ease), color .2s var(--ease)
     }
 
     .set-reset:hover {
-      color: var(--text);
-      background: var(--hover)
+      background: #2a2a2a;
+      color: var(--text)
+    }
+
+    :root[data-theme="light"] .set-reset {
+      background: var(--surface2);
+      color: var(--text2)
+    }
+
+    :root[data-theme="light"] .set-reset:hover {
+      background: var(--hover);
+      color: var(--text)
     }
 
     .set-reset[hidden] {
@@ -2965,7 +3131,7 @@
     }
 
     .topic-note .tn-title {
-      font-weight: 600;
+      font-weight: 430;
       font-size: 14.5px;
       margin-bottom: 2px
     }
@@ -3294,7 +3460,7 @@
     .pc-approve {
       padding: 7px 12px;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 430;
       color: inherit
     }
 
@@ -3426,6 +3592,73 @@
       max-width: 260px;
       font-size: 12px;
       transition: background .15s var(--ease)
+    }
+
+    /* "Hook context" tag above a message: what a Gemini hook added to the prompt, opened on click */
+    .hook-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      max-width: 78%;
+      margin-bottom: 6px
+    }
+
+    .hook-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 24px;
+      padding: 0 8px 0 7px;
+      border: 1px dashed var(--line2);
+      border-radius: 7px;
+      background: none;
+      color: var(--muted);
+      font: inherit;
+      font-size: 11.5px;
+      cursor: pointer;
+      transition: background .15s var(--ease), color .15s var(--ease)
+    }
+
+    .hook-tag:hover,
+    .hook-tag.open {
+      background: var(--surface2);
+      color: var(--text2)
+    }
+
+    .hook-tag .ic svg {
+      width: 12px;
+      height: 12px;
+      display: block
+    }
+
+    .hook-tag .ex {
+      font-size: 10.5px;
+      opacity: .8
+    }
+
+    .hook-tag .chev {
+      width: 12px;
+      height: 12px;
+      transition: transform .18s var(--ease)
+    }
+
+    .hook-tag.open .chev {
+      transform: rotate(180deg)
+    }
+
+    .hook-body {
+      margin-top: 6px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: var(--surface2);
+      color: var(--text2);
+      font-family: var(--mono, ui-monospace, Consolas, monospace);
+      font-size: 11.5px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 260px;
+      overflow: auto
     }
 
     .msg-atts .att-file:hover {
@@ -3568,7 +3801,9 @@
     .lightbox img {
       max-width: 100%;
       max-height: 100%;
-      border-radius: 10px
+      border-radius: 10px;
+      transition: transform 0.1s ease-out;
+      transform: scale(0.75);
     }
 
     .attach-chip .n {
@@ -3623,7 +3858,7 @@
       background: var(--surface);
       color: var(--text);
       font-size: 12.5px;
-      font-weight: 500;
+      font-weight: 350;
       cursor: pointer;
       box-shadow: 0 6px 18px rgba(0, 0, 0, .3);
       animation: addSelIn .12s var(--ease)
@@ -3749,7 +3984,7 @@
       flex-shrink: 0
     }
 
-    .under-row .ghost-pill {
+    .under-row #modelPill {
       margin-left: auto
     }
 
@@ -3812,7 +4047,7 @@
 
     .quota-ring span {
       font-size: 8.5px;
-      font-weight: 600;
+      font-weight: 430;
       color: var(--muted);
       letter-spacing: -.02em
     }
@@ -3824,10 +4059,7 @@
     /* diff button, top right of the chat */
     /* the files and changes buttons share one card with the same rounded corners as the other buttons */
     .top-right {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      z-index: 3;
+      margin-left: auto;
       display: flex;
       gap: 2px;
       padding: 2px;
@@ -3869,7 +4101,7 @@
       place-items: center;
       font-size: 10.5px;
       line-height: 1;
-      font-weight: 600;
+      font-weight: 430;
       font-variant-numeric: tabular-nums;
       letter-spacing: -.02em;
       border: 2px solid var(--bg);
@@ -3911,7 +4143,7 @@
       align-items: center;
       gap: 8px;
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 430;
       letter-spacing: .05em;
       text-transform: uppercase;
       color: var(--muted);
@@ -3938,7 +4170,7 @@
 
     .qcols {
       font-size: 10.5px;
-      font-weight: 600;
+      font-weight: 430;
       letter-spacing: .04em;
       text-transform: uppercase;
       color: var(--muted);
@@ -4195,7 +4427,9 @@
       display: none;
       flex-direction: column;
       background: var(--surface);
-      border-left: 1px solid var(--line);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      margin: 12px;
       box-shadow: -4px 0 16px rgba(0, 0, 0, .18);
       position: relative;
       min-width: 0
@@ -4212,9 +4446,9 @@
     #diffPanel .dp-resizer {
       position: absolute;
       left: -4px;
-      top: 0;
+      top: 16px;
       width: 8px;
-      height: 100%;
+      height: calc(100% - 32px);
       cursor: col-resize;
       z-index: 4
     }
@@ -4227,6 +4461,7 @@
       width: 2px;
       height: 100%;
       background: var(--accent-grad-v);
+      border-radius: 99px;
       opacity: 0;
       transition: opacity .2s
     }
@@ -4241,18 +4476,20 @@
       align-items: center;
       gap: 8px;
       padding: 12px 12px 10px 16px;
-      border-bottom: 1px solid var(--line)
+      border-bottom: 1px solid var(--line);
+      border-top-left-radius: inherit;
+      border-top-right-radius: inherit;
     }
 
     .dp-head b {
       font-size: 13.5px;
-      font-weight: 600
+      font-weight: 430
     }
 
     .dp-status {
       flex: 1;
       font-size: 12px;
-      font-weight: 500
+      font-weight: 350
     }
 
     /* Changes | Files */
@@ -4270,7 +4507,7 @@
       padding: 3px 10px;
       border-radius: 6px;
       font-size: 12px;
-      font-weight: 500;
+      font-weight: 350;
       color: var(--muted)
     }
 
@@ -4319,7 +4556,9 @@
 
       body.panel-max #diffPanel {
         width: 100vw;
-        inset: 0
+        inset: 0;
+        margin: 0;
+        border-radius: 0;
       }
     }
 
@@ -4338,7 +4577,11 @@
 
     body.panel-max #diffPanel {
       flex: 1;
-      width: auto
+      width: auto;
+      margin: 0;
+      border-radius: 0;
+      border: none;
+      border-left: 1px solid var(--line);
     }
 
     body.panel-max #diffPanel .dp-resizer {
@@ -4350,7 +4593,9 @@
       display: flex;
       flex-direction: column;
       min-height: 0;
-      background: var(--code)
+      background: var(--code);
+      border-bottom-left-radius: inherit;
+      border-bottom-right-radius: inherit;
     }
 
     .fx-bar {
@@ -4671,7 +4916,7 @@
 
     .frow .ftag {
       font-size: 10.5px;
-      font-weight: 600;
+      font-weight: 430;
       color: var(--git-c, var(--muted))
     }
 
@@ -4838,6 +5083,26 @@
       outline: 0
     }
 
+    /* Hide scrollbar by default, show on hover */
+    .fv-body::-webkit-scrollbar {
+      background: transparent;
+    }
+
+    .fv-body::-webkit-scrollbar-thumb {
+      background: transparent;
+      border: 3px solid transparent;
+    }
+
+    .fv-body:hover::-webkit-scrollbar-thumb {
+      background: var(--faint);
+      border: 3px solid var(--bg);
+    }
+
+    /* Hide the white square at the corner */
+    ::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+
     .fv-body pre.fcode {
       margin: 0;
       padding: 6px 0 30px;
@@ -4850,7 +5115,8 @@
     .fv-body pre.fcode .l {
       display: grid;
       grid-template-columns: var(--gutter, 4.2em) 1fr;
-      padding-right: 14px
+      padding-right: 14px;
+      padding-left: 8px;
     }
 
     .fv-body pre.fcode .l .n {
@@ -4964,7 +5230,7 @@
       background: var(--text);
       color: var(--bg);
       border-color: var(--text);
-      font-weight: 600
+      font-weight: 430
     }
 
     .csv-bar .csv-save:hover:not(:disabled) {
@@ -4979,10 +5245,14 @@
       min-height: 0
     }
 
+    /* columns keep their natural width (long text wraps at 360px) instead of being squeezed to fit the pane;
+       when they don't fit, the table scrolls sideways */
     .csv-table {
       border-collapse: separate;
       border-spacing: 0;
-      font-size: 12.5px
+      font-size: 12.5px;
+      width: max-content;
+      min-width: 100%
     }
 
     .csv-table th,
@@ -5027,7 +5297,7 @@
       padding: 0 9px;
       background: var(--surface2);
       color: var(--muted);
-      font-weight: 500;
+      font-weight: 350;
       font-size: 11px;
       text-align: center
     }
@@ -5042,7 +5312,7 @@
       z-index: 1;
       background: var(--surface);
       color: var(--text);
-      font-weight: 600
+      font-weight: 430
     }
 
     .csv-table th.rn {
@@ -5055,6 +5325,7 @@
       color: var(--muted);
       font: 11px var(--mono-font);
       text-align: right;
+      white-space: nowrap;
       user-select: none
     }
 
@@ -5121,7 +5392,7 @@
 
     .csv-table td.mdc :is(h1, h2, h3, h4, h5, h6) {
       font-size: 1em;
-      font-weight: 700;
+      font-weight: 520;
       margin: 0 0 2px
     }
 
@@ -5301,7 +5572,9 @@
     .diff-body {
       flex: 1;
       overflow: auto;
-      background: var(--code)
+      background: var(--code);
+      border-bottom-left-radius: inherit;
+      border-bottom-right-radius: inherit;
     }
 
     .dfile {
@@ -5420,7 +5693,7 @@
     .dfile-body .hunk {
       color: var(--accent);
       background: var(--surface);
-      font-weight: 500
+      font-weight: 350
     }
 
     .dfile-body .meta {
@@ -5457,7 +5730,7 @@
     #settings .head {
       padding: 6px 9px 4px;
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 430;
       letter-spacing: .05em;
       text-transform: uppercase;
       color: var(--muted)
@@ -5516,7 +5789,7 @@
     .selmenu .grp {
       padding: 7px 10px 3px;
       font-size: 10.5px;
-      font-weight: 600;
+      font-weight: 430;
       letter-spacing: .05em;
       text-transform: uppercase;
       color: var(--muted)
@@ -5659,6 +5932,2625 @@
       display: none
     }
 
+    /* ---------- app frame (ui-refactor) ----------
+       A chrome strip along the top (the chat's breadcrumb, the open file tabs) and one content surface under it,
+       shared by the chat and the file panel and split by a 1px line. The sidebar sits on the chrome.
+       --surface is the chrome, --bg the content surface. */
+    body {
+      background: var(--surface)
+    }
+
+    aside {
+      background: transparent;
+      border-right: 0;
+      box-shadow: none
+    }
+
+    body.collapsed aside {
+      background: var(--surface);
+      border-right: 1px solid var(--line)
+    }
+
+    main {
+      margin: 38px 8px 8px 0;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--bg)
+    }
+
+    body.collapsed main {
+      margin-left: 8px
+    }
+
+    #chat {
+      border-radius: 10px 10px 0 0
+    }
+
+    /* the breadcrumb row sits on the chrome, just above the surface */
+    header,
+    main.fresh header {
+      position: absolute;
+      top: -39px;
+      left: -1px;
+      right: -1px;
+      height: 38px;
+      padding: 0 4px 0 10px;
+      gap: 8px;
+      background: transparent;
+      border: 0
+    }
+
+    .header-title {
+      font-size: 13px;
+      gap: 7px
+    }
+
+    .header-title .title-text {
+      font-weight: 350
+    }
+
+    header .icon-btn,
+    .top-right .icon-btn {
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent
+    }
+
+    header .icon-btn:hover,
+    .top-right .icon-btn:hover {
+      background: var(--hover)
+    }
+
+    .top-right {
+      align-items: center;
+      gap: 2px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: none
+    }
+
+    .top-right .badge {
+      box-shadow: 0 0 0 2px var(--surface)
+    }
+
+    .top-right #branchPill {
+      margin-right: 4px
+    }
+
+    .top-right #branchPill .v {
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    header .header-title {
+      flex: 1
+    }
+
+    /* ---------- sidebar ---------- */
+    .brand {
+      height: 38px;
+      padding: 0 8px;
+      gap: 2px
+    }
+
+    .brand-gap {
+      flex: 1
+    }
+
+    .brand .icon-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px
+    }
+
+    .new-row {
+      padding: 0 8px 6px
+    }
+
+    .new-row .side-act {
+      width: 100%;
+      height: 30px;
+      padding: 0 10px;
+      gap: 8px;
+      border: 1px solid var(--side-btn-line);
+      border-radius: 7px;
+      background: var(--side-btn);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 350
+    }
+
+    .new-row .side-act svg {
+      width: 15px;
+      height: 15px
+    }
+
+    .new-row .side-act:hover {
+      background: var(--hover)
+    }
+
+    .search-box {
+      margin: 0 8px 2px;
+      height: 30px;
+      padding: 0 10px;
+      gap: 8px;
+      border-radius: 7px;
+      background: transparent;
+      border-color: transparent
+    }
+
+    .search-box:hover,
+    .search-box:focus-within {
+      background: var(--hover);
+      border-color: transparent
+    }
+
+    .search-box svg {
+      width: 15px;
+      height: 15px
+    }
+
+    .search-box input {
+      font-size: 13px
+    }
+
+    .search-box kbd {
+      border-color: var(--line2)
+    }
+
+    .label {
+      justify-content: space-between;
+      padding: 14px 10px 4px 16px !important
+    }
+
+    .label .lbl-t {
+      font-size: 12px;
+      font-weight: 350;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--muted)
+    }
+
+    .sessions {
+      padding: 0 8px 8px
+    }
+
+    .g-head {
+      height: 30px;
+      padding: 0 8px;
+      gap: 8px;
+      border-radius: 7px;
+      color: var(--text2);
+      font-size: 13px;
+      font-weight: 350
+    }
+
+    .g-head:hover {
+      color: var(--text);
+      background: var(--hover)
+    }
+
+    .g-ic {
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+      color: var(--muted)
+    }
+
+    .g-name {
+      margin-right: auto
+    }
+
+    .g-count {
+      display: none
+    }
+
+    .g-caret {
+      opacity: 0;
+      transition: opacity .15s, transform .2s var(--ease)
+    }
+
+    .g-head:hover .g-caret {
+      opacity: .7
+    }
+
+    .g-items {
+      margin: 0 0 6px
+    }
+
+    .sess {
+      padding: 5px 8px 5px 31px;
+      border-radius: 7px;
+      margin-bottom: 1px
+    }
+
+    .sess .t {
+      font-size: 13px;
+      line-height: 20px;
+      color: var(--text2);
+      opacity: 1;
+      padding-right: 30px
+    }
+
+    .sess:hover {
+      background: var(--hover)
+    }
+
+    .sess:hover .t {
+      opacity: 1;
+      color: var(--text)
+    }
+
+    .sess.active {
+      background: var(--side-active)
+    }
+
+    .sess.active .t {
+      color: var(--text)
+    }
+
+    .sess .when {
+      top: 7px;
+      right: 8px;
+      font-size: 11px
+    }
+
+    .g-more {
+      padding: 2px 8px 4px 31px
+    }
+
+    .side-foot {
+      border-top: 0;
+      padding: 6px 8px 10px
+    }
+
+    #settingsBtn {
+      width: auto;
+      height: 30px;
+      padding: 0 10px 0 8px;
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text2)
+    }
+
+    #settingsBtn svg {
+      width: 16px;
+      height: 16px
+    }
+
+    #settingsBtn:hover {
+      color: var(--text);
+      background: var(--hover)
+    }
+
+    /* ---------- message box: text on top, a toolbar under it ---------- */
+    main:not(.fresh) .composer-wrap {
+      padding: 4px 12px 12px;
+      border-radius: 0 0 10px 10px
+    }
+
+    main:not(.fresh) .under-row {
+      display: none                  /* the folder is in the breadcrumb, the branch in the top strip */
+    }
+
+    .composer {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 4px;
+      padding: 10px 8px 8px 14px;
+      border-radius: 12px;
+      border-color: var(--composer-line);
+      background: var(--composer-bg)
+    }
+
+    .composer:focus-within {
+      border-color: var(--line2)
+    }
+
+    .composer textarea {
+      flex: none;
+      width: 100%;
+      padding: 2px 4px 4px 0;
+      font-size: 14px;
+      line-height: 1.5
+    }
+
+    .c-bar {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      margin-left: -6px
+    }
+
+    .c-bar .c-gap {
+      flex: 1
+    }
+
+    .c-bar .clip {
+      width: 28px;
+      height: 28px;
+      margin: 0;
+      border-radius: 7px
+    }
+
+    .c-bar .clip svg {
+      width: 16px;
+      height: 16px
+    }
+
+    .c-bar .mic svg {
+      width: 17px;
+      height: 17px
+    }
+
+    .c-bar .pill {
+      height: 28px;
+      padding: 0 7px;
+      gap: 5px;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12.5px;
+      font-weight: 270
+    }
+
+    .c-bar .pill svg {
+      color: currentColor
+    }
+
+    .c-bar .pill:hover {
+      background: var(--composer-hover);
+      color: var(--text)
+    }
+
+    .c-bar .pill:not(.locked)::after {
+      content: "";
+      width: 5px;
+      height: 5px;
+      margin: -3px 0 0 1px;
+      border: solid currentColor;
+      border-width: 0 1.5px 1.5px 0;
+      transform: rotate(45deg);
+      opacity: .6;
+      flex-shrink: 0
+    }
+
+    .c-bar .quota-ring {
+      margin: 0 4px
+    }
+
+    .send {
+      width: 30px;
+      height: 30px;
+      margin-left: 4px;
+      background: var(--send-bg);
+      color: var(--send-fg)
+    }
+
+    .send svg {
+      width: 15px;
+      height: 15px
+    }
+
+    .send:disabled {
+      background: var(--send-off-bg);
+      color: var(--send-off-fg)
+    }
+
+    .send.stop {
+      background: var(--send-bg);
+      color: var(--send-fg)
+    }
+
+    /* ---------- messages ---------- */
+    .msg.user .bubble {
+      background: var(--bubble);
+      border: 1px solid var(--bubble-line);
+      border-radius: 12px;
+      padding: 8px 14px;
+      font-size: 14px
+    }
+
+    .msg.user .bubble.clamped::after {
+      background: linear-gradient(to bottom, transparent, var(--bubble) 78%)
+    }
+
+    .msg.ai .md {
+      line-height: 1.7;
+      color: var(--text)
+    }
+
+    .md strong {
+      font-weight: 460;               /* clearly bold, but lighter than semibold */
+      color: var(--text)
+    }
+
+    .md code {
+      background: var(--surface2);
+      border: 1px solid var(--line);
+      padding: 1px 5px;
+      border-radius: 5px
+    }
+
+    .md pre code {
+      border: 0
+    }
+
+    .md li {
+      margin: .3em 0
+    }
+
+    /* ---------- file panel ---------- */
+    #diffPanel {
+      background: var(--bg);
+      box-shadow: none;
+      border-radius: 10px
+    }
+
+    .files-body {
+      background: var(--bg)
+    }
+
+    .dp-tabs {
+      gap: 14px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: none
+    }
+
+    .dp-tabs button {
+      padding: 4px 1px;
+      border-radius: 0;
+      border-bottom: 2px solid transparent
+    }
+
+    .dp-tabs button.on {
+      background: none;
+      border-bottom-color: var(--text)
+    }
+
+    #diffPanel:not(.files) .fx-tabs {
+      display: none
+    }
+
+    .dp-head .fx-tabs {
+      margin-left: 10px
+    }
+
+    .fx-tab {
+      height: 26px;
+      padding: 0 6px 0 9px;
+      border-radius: 7px
+    }
+
+    .fx-tab.on {
+      background: var(--hover)
+    }
+
+    .fx-tab.on .nm {
+      font-style: normal
+    }
+
+    .fx-tab:not(.on):not(:hover) .x {
+      visibility: hidden
+    }
+
+    .dp-head .icon-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px
+    }
+
+    .dp-head .icon-btn:hover {
+      background: var(--hover)
+    }
+
+    /* under the tabs: the open file's path, then its tools */
+    .fv-head {
+      height: 36px;
+      padding: 0 6px 0 14px;
+      border-bottom: 0
+    }
+
+    .fv-head .fv-crumbs {
+      flex: 1;
+      min-width: 0;
+      padding: 0;
+      border: 0
+    }
+
+    .fv-crumbs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden
+    }
+
+    .fv-crumbs[hidden] {
+      display: none
+    }
+
+    .fv-crumbs .sep {
+      font-style: normal;
+      opacity: .6
+    }
+
+    .fv-crumbs .cur {
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    pre.fcode .l .n {
+      color: var(--gutter)
+    }
+
+    /* the file list on the right: same surface as the file, a line between them */
+    .fx-side {
+      background: var(--bg);
+      border-left: 1px solid var(--line)
+    }
+
+    .fx-title {
+      padding: 10px 14px 6px;
+      font-size: 12px;
+      font-weight: 350;
+      color: var(--muted)
+    }
+
+    .fx-filter {
+      margin: 0 8px 6px;
+      height: 28px;
+      border-color: var(--line);
+      border-radius: 7px;
+      background: transparent
+    }
+
+    .fx-filter:focus-within {
+      border-color: var(--line2)
+    }
+
+    .ftree {
+      padding: 0 6px 16px
+    }
+
+    .frow {
+      color: var(--text2)
+    }
+
+    .frow:hover,
+    .frow.menu-open {
+      background: color-mix(in srgb, var(--hover) 60%, transparent)
+    }
+
+    .frow.active {
+      background: var(--hover)
+    }
+
+    /* ---------- the chat runs under the message box ----------
+       The box floats over the bottom of the chat; replies scroll beneath it and fade out just above it.
+       --composer-h is kept up to date by a ResizeObserver on the box's area. */
+    main:not(.fresh) .composer-wrap {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 3;
+      padding: 28px 12px 12px;
+      background: linear-gradient(to bottom, transparent, var(--bg) 26px);
+      pointer-events: none
+    }
+
+    main:not(.fresh) .composer-wrap > * {
+      pointer-events: auto
+    }
+
+    main:not(.fresh) #chat .inner {
+      padding-bottom: calc(var(--composer-h, 140px) + 8px)
+    }
+
+    .composer {
+      border-radius: 16px;
+      padding: 12px 8px 8px 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .35)
+    }
+
+    .c-bar .pill#modelPill {
+      color: var(--text2)
+    }
+
+    .c-bar #attachBtn {
+      color: var(--text2)
+    }
+
+    /* message box, measured against the reference: lighter border with a faint top highlight, 18px corners,
+       a light placeholder, a thin small "+", a white 28px send button */
+    .composer {
+      border-color: #2e2e2e;
+      border-radius: 18px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 6px 18px rgba(0, 0, 0, .28)
+    }
+
+    :root[data-theme="light"] .composer {
+      border-color: var(--composer-line);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, .08)
+    }
+
+    .composer textarea::placeholder {
+      color: #9e9e9e
+    }
+
+    :root[data-theme="light"] .composer textarea::placeholder {
+      color: var(--composer-ph)
+    }
+
+    .c-bar #attachBtn {
+      color: #9b9b9b
+    }
+
+    .c-bar #attachBtn svg {
+      width: 13px;
+      height: 13px
+    }
+
+    .c-bar #attachBtn svg path {
+      stroke-width: 1.8
+    }
+
+    .c-bar .pill {
+      font-size: 13px
+    }
+
+    .c-bar #approvalPill {
+      color: #a8a8a8
+    }
+
+    .c-bar #approvalPill:hover,
+    .c-bar #modelPill:hover {
+      color: var(--text)
+    }
+
+    .send,
+    .send:disabled {
+      width: 28px;
+      height: 28px;
+      background: #ffffff;
+      color: #111111
+    }
+
+    .send:disabled {
+      color: #8a8a8a
+    }
+
+    :root[data-theme="light"] .send,
+    :root[data-theme="light"] .send:disabled {
+      background: #111111;
+      color: #ffffff
+    }
+
+    :root[data-theme="light"] .send:disabled {
+      color: #9a9a9a
+    }
+
+    main:not(.fresh) .composer-wrap {
+      padding: 28px 16px 30px
+    }
+
+    /* ---------- the sidebar button stays in one place (top-left), open or closed; no opening on hover ---------- */
+    @media (min-width:761px) {
+      #menu {
+        display: grid;
+        position: fixed;
+        top: 5px;
+        left: 8px;
+        z-index: 32
+      }
+
+      #collapse {
+        visibility: hidden
+      }
+
+      body.collapsed header {
+        padding-left: 40px
+      }
+    }
+
+    body.collapsed .side-edge {
+      display: none
+    }
+
+    /* ---------- settings: a dialog with pages ---------- */
+    #settings {
+      position: fixed;
+      inset: 0;
+      left: 0;
+      bottom: 0;
+      width: auto;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      background: rgba(0, 0, 0, .5);
+      transition: opacity .15s
+    }
+
+    .set-dialog {
+      display: flex;
+      width: min(840px, 100%);
+      height: min(580px, 100%);
+      background: var(--surface);
+      border: 1px solid var(--line2);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, .5)
+    }
+
+    .set-nav {
+      width: 180px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 14px 8px;
+      /* margin: 20px; */
+    }
+
+    .set-nav-h {
+      padding: 0 10px 6px;
+      font-size: 12px;
+      color: var(--muted)
+    }
+
+    .set-nav button {
+      height: 32px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 0;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text2);
+      background: transparent;
+      cursor: pointer;
+      transition: background .2s var(--ease), color .2s var(--ease)
+    }
+
+    .set-nav button:hover {
+      background: rgba(255, 255, 255, .05);
+      color: var(--text)
+    }
+
+    .set-nav button.on {
+      background: #222222;
+      color: var(--text)
+    }
+
+    :root[data-theme="light"] .set-nav button:hover {
+      background: var(--hover);
+      color: var(--text)
+    }
+
+    :root[data-theme="light"] .set-nav button.on {
+      background: var(--surface2);
+      color: var(--text)
+    }
+
+    .set-nav-acc {
+      margin-top: auto;
+      padding-top: 10px;
+      /* border-top: 1px solid var(--line2); */
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .set-nav-acc[hidden] {
+      display: none !important;
+    }
+
+    .set-acc-card {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      cursor: default;
+      transition: background .15s var(--ease);
+      min-width: 0;
+    }
+
+    .set-acc-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--line2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: var(--accent);
+    }
+
+    .set-acc-avatar svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    .set-acc-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .set-acc-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      line-height: 1.3;
+    }
+
+    .set-acc-email {
+      font-size: 10.5px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      line-height: 1.2;
+    }
+
+    .set-acc-email[hidden] {
+      display: none;
+    }
+
+    .set-main {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .set-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      border: 0;
+      background: #222222;
+      color: var(--text2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background .2s var(--ease), color .2s var(--ease);
+      z-index: 10;
+    }
+
+    .set-close:hover {
+      background: #2a2a2a;
+      color: var(--text)
+    }
+
+    :root[data-theme="light"] .set-close {
+      background: var(--surface2);
+      color: var(--text2)
+    }
+
+    :root[data-theme="light"] .set-close:hover {
+      background: var(--hover);
+      color: var(--text)
+    }
+
+    .set-sec {
+      background: var(--bg);
+      border-top-left-radius: 14px;
+      border-bottom-left-radius: 14px;
+      padding: 30px 40px 36px;
+      border-left: var(--side-active) solid 1px;
+      position: relative;
+      height: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      overscroll-behavior: contain;
+    }
+
+    .set-sec h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 430
+    }
+
+    .set-sub {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: var(--muted)
+    }
+
+    .set-sec h3 {
+      margin: 24px 0 3px;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--text)
+    }
+
+    .set-sec-desc {
+      margin: 0 0 10px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4
+    }
+
+    .set-card {
+      border: 1px solid var(--line2);
+      border-radius: 12px;
+      background: var(--surface);
+      box-shadow: none !important
+    }
+
+    .set-card .set-row {
+      padding: 10px 14px;
+      border-radius: 0;
+      border-top: 1px solid var(--line2);
+      min-height: 48px
+    }
+
+    .set-card .set-row:first-child {
+      border-top: 0
+    }
+
+    .set-card .set-label {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      color: var(--text);
+      font-size: 13px
+    }
+
+    .set-card .set-label .set-label-text {
+      color: var(--text);
+      font-weight: 500;
+      line-height: 1.35
+    }
+
+    .set-card .set-label .set-desc {
+      font-size: 11.5px;
+      color: var(--muted);
+      font-weight: 400;
+      line-height: 1.35
+    }
+
+    .set-card .set-row select {
+      width: auto;
+      min-width: 170px;
+      max-width: 240px
+    }
+
+    /* ---------- review-style diffs ---------- */
+    .dfile-head {
+      gap: 8px;
+      padding: 8px 10px 8px 14px;
+      background: var(--bg);
+      font-family: var(--ui-font);
+      font-size: 12.5px
+    }
+
+    .dfile-head:hover {
+      background: color-mix(in srgb, var(--hover) 50%, var(--bg))
+    }
+
+    .dfile-head .ic {
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      color: var(--muted)
+    }
+
+    .dfile-head .ic svg {
+      width: 14px;
+      height: 14px
+    }
+
+    .dfile-head .name {
+      flex: none;
+      max-width: 50%;
+      direction: ltr;
+      color: var(--text);
+      font-weight: 350
+    }
+
+    .dfile-head .dir {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      direction: rtl;
+      text-align: left;
+      color: var(--muted)
+    }
+
+    .dfile-head .ch-nums {
+      display: inline-flex;
+      gap: 6px;
+      font: 12px var(--mono-font)
+    }
+
+    .ch-nums .plus {
+      color: var(--git-new)
+    }
+
+    .ch-nums .minus {
+      color: var(--git-del)
+    }
+
+    .dcode {
+      padding: 2px 0 6px;
+      background: transparent;
+      font: 12px/1.6 var(--mono-font)
+    }
+
+    .dl {
+      display: flex
+    }
+
+    .dl .no {
+      flex: none;
+      width: 5ch;
+      padding-right: 12px;
+      text-align: right;
+      color: var(--gutter);
+      border-left: 3px solid transparent;
+      user-select: none
+    }
+
+    .dl .c {
+      flex: 1;
+      min-width: 0;
+      padding-right: 12px;
+      white-space: pre-wrap;
+      word-break: break-word
+    }
+
+    .dfile-body .dl.add {
+      background: color-mix(in srgb, var(--git-new) 20%, transparent);
+      color: var(--text)
+    }
+
+    .dfile-body .dl.add .no {
+      border-left-color: var(--git-new);
+      color: color-mix(in srgb, var(--git-new) 70%, var(--text))
+    }
+
+    .dfile-body .dl.del {
+      background: color-mix(in srgb, var(--git-del) 22%, transparent);
+      color: var(--text);
+      text-decoration: none
+    }
+
+    .dfile-body .dl.del .no {
+      border-left-color: var(--git-del);
+      color: color-mix(in srgb, var(--git-del) 70%, var(--text))
+    }
+
+    .dgap {
+      width: fit-content;
+      max-width: calc(100% - 24px);
+      margin: 6px auto;
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: var(--surface2);
+      color: var(--muted);
+      font: 11px var(--ui-font);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    /* ---------- under a reply: "2 files changed +119 −0 ›   Review" ---------- */
+    .changed-card {
+      margin: 16px 0 4px;
+      padding: 0;
+      border: 1px solid var(--line2);
+      border-radius: 10px;
+      background: transparent
+    }
+
+    .changed-card .ch-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      padding: 6px 6px 6px 14px;
+      border: 0
+    }
+
+    .ch-sum {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text2)
+    }
+
+    .ch-sum:hover {
+      color: var(--text)
+    }
+
+    .ch-chev {
+      width: 5px;
+      height: 5px;
+      border-right: 1.5px solid currentColor;
+      border-bottom: 1.5px solid currentColor;
+      transform: rotate(-45deg);
+      opacity: .7;
+      transition: transform .2s var(--ease)
+    }
+
+    .changed-card.open .ch-chev {
+      transform: rotate(45deg)
+    }
+
+    .ch-review {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 28px;
+      padding: 0 10px;
+      border: 1px solid var(--line2);
+      border-radius: 7px;
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 12.5px
+    }
+
+    .ch-review:hover {
+      background: var(--hover)
+    }
+
+    .ch-review svg {
+      width: 14px;
+      height: 14px
+    }
+
+    .ch-list {
+      display: none;
+      padding: 6px;
+      border-top: 1px solid var(--line)
+    }
+
+    .changed-card.open .ch-list {
+      display: block
+    }
+
+    /* ---------- message dots ---------- */
+    .turn-nav {
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 4;
+      display: flex;
+      flex-direction: column
+    }
+
+    .tn-dot {
+      width: 16px;
+      height: var(--pitch, 10px);
+      display: grid;
+      place-items: center
+    }
+
+    .tn-dot::before {
+      content: "";
+      width: clamp(3px, calc(var(--pitch, 10px) - 4px), 5px);
+      height: clamp(3px, calc(var(--pitch, 10px) - 4px), 5px);
+      border-radius: 50%;
+      background: var(--faint);
+      transition: background .15s, transform .15s
+    }
+
+    .tn-dot:hover::before {
+      background: var(--text2);
+      transform: scale(1.3)
+    }
+
+    .tn-dot.on::before {
+      background: var(--text)
+    }
+
+    .turn-tip {
+      position: absolute;
+      z-index: 20;
+      width: 290px;
+      padding: 10px 12px;
+      border: 1px solid var(--line2);
+      border-radius: 10px;
+      background: var(--surface);
+      box-shadow: 0 14px 34px rgba(0, 0, 0, .45);
+      pointer-events: none
+    }
+
+    .tt-q {
+      font-size: 13px;
+      font-weight: 350;
+      color: var(--text);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden
+    }
+
+    .tt-a {
+      margin-top: 6px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--muted);
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden
+    }
+
+    .tt-n {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--muted)
+    }
+
+    @media (max-width:760px) {
+      .turn-nav,
+      .turn-tip {
+        display: none !important
+      }
+
+      .set-nav {
+        width: 120px
+      }
+
+      .set-sec {
+        padding: 24px 18px
+      }
+    }
+
+    /* ---------- shapes, measured against the reference ----------
+       Controls (toolbar pills, dropdowns, switches, tabs, icon buttons) are fully round; surfaces have soft corners:
+       rows and sidebar items 8px, cards 12–16px, the message box 18px. */
+
+    /* message box: a 1px #232323 line (a lighter top edge), a soft 5px rim just outside it, a shadow under it */
+    .composer {
+      border-color: #242424;
+      box-shadow: 0 0 0 5px rgba(255, 255, 255, .025), inset 0 1px 0 rgba(255, 255, 255, .045), 0 10px 18px rgba(0, 0, 0, .3)
+    }
+
+    :root[data-theme="light"] .composer {
+      box-shadow: 0 0 0 5px rgba(0, 0, 0, .025), 0 8px 18px rgba(0, 0, 0, .06)
+    }
+
+    .composer:focus-within {
+      border-color: #2e2e2e
+    }
+
+    :root[data-theme="light"] .composer:focus-within {
+      border-color: var(--line2)
+    }
+
+    .c-bar .pill,
+    .c-bar .clip {
+      border-radius: 999px
+    }
+
+    .c-bar .pill:hover {
+      background: #2c2c2c
+    }
+
+    :root[data-theme="light"] .c-bar .pill:hover {
+      background: var(--composer-hover)
+    }
+
+    /* the little pill tooltip above a toolbar control */
+    .c-bar [data-tip]::before {
+      content: attr(data-tip);
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 8px);
+      transform: translateX(-50%);
+      padding: 3px 10px;
+      border: 1px solid #303030;
+      border-radius: 999px;
+      background: #1b1b1b;
+      color: var(--text2);
+      font-size: 12px;
+      font-weight: 270;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .12s
+    }
+
+    :root[data-theme="light"] .c-bar [data-tip]::before {
+      border-color: var(--line2);
+      background: var(--surface)
+    }
+
+    .c-bar [data-tip]:hover::before {
+      opacity: 1;
+      transition-delay: .35s
+    }
+
+    /* buttons and tabs */
+    header .icon-btn,
+    .top-right .icon-btn,
+    .dp-head .icon-btn,
+    .brand .icon-btn,
+    #menu,
+    .set-nav button {
+      border-radius: 999px
+    }
+
+    .fx-tab {
+      border-radius: 999px
+    }
+
+    .new-row .side-act,
+    .search-box,
+    .g-head,
+    .sess,
+    #settingsBtn {
+      border-radius: 8px
+    }
+
+    main {
+      border-radius: 12px
+    }
+
+    #chat {
+      border-radius: 12px 12px 0 0
+    }
+
+    main:not(.fresh) .composer-wrap {
+      border-radius: 0 0 12px 12px
+    }
+
+    .msg.user .bubble {
+      border-radius: 16px
+    }
+
+    .changed-card {
+      border-radius: 12px
+    }
+
+    .ch-review {
+      border-radius: 8px
+    }
+
+    .md code {
+      border-radius: 6px
+    }
+
+    .turn-tip {
+      border-radius: 12px
+    }
+
+    .set-dialog {
+      border-radius: 16px
+    }
+
+    /* settings: cards with normal border and solid background; round dropdowns and switches */
+    .set-card {
+      border: 1px solid var(--line2);
+      border-radius: 12px;
+      background: var(--surface);
+      box-shadow: none
+    }
+
+    .set-card .set-row select {
+      height: 30px;
+      padding: 0 24px 0 14px !important;
+      border-radius: 999px;
+      border: 0;
+      background-color: #222222;
+      color: var(--text2);
+      font-size: 13px
+    }
+
+    :root[data-theme="light"] .set-card .set-row select {
+      background-color: var(--surface2)
+    }
+
+    .set-card .set-row select:hover,
+    .set-card .set-row select:focus {
+      border: 0;
+      color: var(--text);
+      background-color: #2a2a2a
+    }
+
+    :root[data-theme="light"] .set-card .set-row select:hover,
+    :root[data-theme="light"] .set-card .set-row select:focus {
+      background-color: var(--hover)
+    }
+
+    .set-card .seg {
+      height: 30px;
+      padding: 2px;
+      gap: 2px;
+      border: 0;
+      border-radius: 999px;
+      background: #222222;
+      display: inline-flex;
+      align-items: center;
+      box-shadow: none
+    }
+
+    :root[data-theme="light"] .set-card .seg {
+      background: var(--surface2)
+    }
+
+    .set-card .seg button {
+      height: 26px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .2s var(--ease), color .2s var(--ease)
+    }
+
+    .set-card .seg button:hover {
+      color: var(--text)
+    }
+
+    .set-card .seg button.on {
+      background: #333333;
+      color: var(--text);
+      box-shadow: none
+    }
+
+    :root[data-theme="light"] .set-card .seg button.on {
+      background: #ffffff;
+      color: var(--text);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .08)
+    }
+
+    .set-card .set-reset {
+      height: 30px;
+      padding: 0 14px;
+      border: 0;
+      border-radius: 999px;
+      background: #222222;
+      color: var(--text2);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: none;
+      transition: background .2s var(--ease), color .2s var(--ease)
+    }
+
+    .set-card .set-reset:hover {
+      background: #2a2a2a;
+      color: var(--text)
+    }
+
+    :root[data-theme="light"] .set-card .set-reset {
+      background: var(--surface2)
+    }
+
+    /* ---------- files and folders named in a reply: an icon, a tinted chip ---------- */
+    .md code.fileref,
+    .md code.fmiss {
+      padding: 1px 8px 1px 5px;
+      border-radius: 7px;
+      overflow-wrap: anywhere
+    }
+
+    .md code.fileref {
+      background: color-mix(in srgb, var(--accent) 12%, var(--surface2));
+      border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+      color: var(--text);
+      text-decoration: none
+    }
+
+    .md code.fileref:hover {
+      background: color-mix(in srgb, var(--accent) 22%, var(--surface2));
+      border-color: var(--accent);
+      color: var(--text)
+    }
+
+    .md code.fmiss {
+      border-style: dashed;
+      color: var(--muted)
+    }
+
+    code .fi {
+      display: inline-block;
+      vertical-align: -3px;
+      margin-right: 5px;
+      user-select: none;
+      pointer-events: none
+    }
+
+    code .fi > svg {
+      display: block;
+      width: 14px;
+      height: 14px;
+      color: var(--accent)
+    }
+
+    code.fmiss .fi {
+      opacity: .6
+    }
+
+    code.fmiss .fi > svg {
+      color: var(--muted)
+    }
+
+    /* the stop button (while Gemini is working) is red */
+    .send.stop,
+    .send.stop:disabled,
+    :root[data-theme="light"] .send.stop,
+    :root[data-theme="light"] .send.stop:disabled {
+      background: var(--gem-red);
+      color: #ffffff
+    }
+
+    .send.stop:hover,
+    :root[data-theme="light"] .send.stop:hover {
+      background: color-mix(in srgb, var(--gem-red) 80%, #000000);
+      color: #ffffff
+    }
+
+    /* the model name has no arrow (the mode keeps its own) */
+    .c-bar #modelPill::after {
+      display: none
+    }
+
+    /* inline code in replies: a warm tan, as in the reference (file chips keep their own colours) */
+    .md :not(pre) > code {
+      color: #e1ccb5
+    }
+
+    :root[data-theme="light"] .md :not(pre) > code {
+      color: #9a5b25
+    }
+
+    /* the folded steps row ("Worked for 17s", "4 steps", "3 thoughts", the counts, the arrow): quieter than before.
+       The failure count keeps its red. */
+    .tools-head {
+      color: color-mix(in srgb, var(--muted) 76%, var(--bg))
+    }
+
+    .tools-head .lead {
+      color: inherit;
+      font-weight: 270
+    }
+
+    .tools-head .ti b {
+      font-weight: 270
+    }
+
+    .tools-head .ti.gem svg {
+      opacity: .7
+    }
+
+    /* regular text is a little lighter than Inter's 400 (everything that sets its own weight is one step down too) */
+    body {
+      font-weight: 300
+    }
+
+    /* ---------- spacing: one rhythm, no dead space ----------
+       Blocks of a reply sit 6-8px apart, messages 22-28px apart. Space that is reserved for things that only show
+       on hover (your message's Copy / Edit / Retry, the stats line) no longer adds a full line of its own. */
+    .inner {
+      padding-top: 24px                /* the breadcrumb now sits above the card; 72px was the old header's room */
+    }
+
+    .msg.ai {
+      margin-bottom: 22px
+    }
+
+    /* your message: its action row hangs in the gap under the bubble (the gap is as tall as the row, so nothing
+       overlaps the next message) instead of taking a line of its own */
+    .msg.user {
+      position: relative;
+      margin-bottom: 38px              /* the reference's gap; the hover action row (30px) fits inside it */
+    }
+
+    .msg.user .u-actions {
+      position: absolute;
+      top: 100%;
+      right: 4px;
+      margin: 0;
+      padding-top: 4px                 /* part of the box, so the pointer never leaves it on the way down */
+    }
+
+    /* the stats line (time, tokens, copy) keeps its place, a little closer to the reply */
+    .stats {
+      margin-top: 6px
+    }
+
+    /* a closed row of steps ("37 steps", "2 thoughts", "Worked for 12s") needs no room for a list underneath */
+    .tools.folded:not(.open) {
+      margin-bottom: 6px
+    }
+
+    .tools.folded:not(.open) .tools-head {
+      margin-bottom: 0
+    }
+
+    .md + .tools {
+      margin-top: 8px
+    }
+
+    /* "Wrote file.md +11 −0" rows and saved-note cards */
+    .edit-card {
+      margin: 4px 0 8px
+    }
+
+    .topic-note {
+      margin: 8px 0
+    }
+
+    /* ---------- message text, matched to the reference ----------
+       Thin regular text (stems ~1.5px), pure white on dark; bold is clearly heavier than it (~2.3px); lines
+       22.7px apart, paragraphs ~15px, list items at plain line height. */
+    .md,
+    .msg.user .bubble,
+    .thinking,
+    .tools .step {
+      font-weight: 280
+    }
+
+    :root:not([data-theme="light"]) .msg.ai .md,
+    :root:not([data-theme="light"]) .msg.user .bubble {
+      color: #ffffff
+    }
+
+    .md strong,
+    .md p.md-label {
+      color: inherit
+    }
+
+    .md h1,
+    .md h2,
+    .md h3 {
+      font-weight: 480
+    }
+
+    .msg.ai .md {
+      line-height: 1.62
+    }
+
+    .md p {
+      margin-bottom: 1.05em
+    }
+
+    .md ul,
+    .md ol {
+      margin-bottom: 1.05em
+    }
+
+    .md li {
+      margin: .1em 0
+    }
+
+    /* file chips: the icon is centred on the text (a baseline offset made lines with a chip taller than plain lines),
+       and a chip stays in one piece: if it does not fit, the whole chip moves to the next line */
+    code .fi {
+      vertical-align: middle
+    }
+
+    .md code.fileref,
+    .md code.fmiss {
+      white-space: nowrap
+    }
+
+    .md code.flong {
+      display: inline-block;
+      max-width: 100%;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      vertical-align: top
+    }
+
+    /* ---------- glass: a soft light edge along the top of every card ----------
+       Not a different border colour (that leaves a hard seam where the top meets the sides at the corners) but an
+       inner highlight: a 1px line just inside the border and a barely-there 2px falloff under it (kept slim on
+       purpose: a wide glow looks like Windows Vista). It follows the rounded corners and thins out along the curve,
+       so the light fades smoothly from the top into the sides and is gone below. */
+    :root {
+      --glass: inset 0 1px 0 rgba(255, 255, 255, .13), inset 0 1.5px 1px -1px rgba(255, 255, 255, .025);
+      --glass-strong: inset 0 1px 0 rgba(255, 255, 255, .17), inset 0 1.5px 1px -1px rgba(255, 255, 255, .03)
+    }
+
+    :root[data-theme="light"] {
+      --glass: inset 0 1px 0 rgba(0, 0, 0, .07), inset 0 1.5px 1px -1px rgba(0, 0, 0, .02);
+      --glass-strong: inset 0 1px 0 rgba(0, 0, 0, .10), inset 0 1.5px 1px -1px rgba(0, 0, 0, .03)
+    }
+
+    .msg.user .bubble,
+    .md pre,
+    .step .tool-body,
+    .tool-sec pre,
+    .ec-box,
+    .changed-card,
+    .auth-card,
+    .toast,
+    .ch-review,
+    .pc-changes,
+    .pc-send,
+    .quick-btn,
+    .chip,
+    .attach-chip,
+    .to-bottom,
+    .acc-item,
+    .fx-filter,
+    .fv-toggle,
+    .csv-bar button,
+    .tbl-expand,
+    .tbl-head .copy-tbl,
+    .fv-find input,
+    .pc-feedback textarea {
+      box-shadow: var(--glass)
+    }
+
+    .glass-btn {
+      box-shadow: var(--glass), 0 24px 60px rgba(0, 0, 0, .5)
+    }
+
+    :root[data-theme="light"] .glass-btn {
+      box-shadow: var(--glass), 0 24px 60px rgba(0, 0, 0, .1)
+    }
+
+    .tbl-dialog {
+      box-shadow: var(--glass), 0 24px 60px rgba(0, 0, 0, .5)
+    }
+
+    .dialog {
+      box-shadow: var(--glass), 0 30px 80px rgba(0, 0, 0, .5)
+    }
+
+    .slash-menu {
+      box-shadow: var(--glass), 0 12px 32px rgba(0, 0, 0, .35)
+    }
+
+    .selmenu {
+      box-shadow: var(--glass), 0 16px 40px rgba(0, 0, 0, .45)
+    }
+
+    .chatmenu {
+      box-shadow: var(--glass), 0 16px 40px rgba(0, 0, 0, .45)
+    }
+
+    .fmenu .flyout {
+      box-shadow: var(--glass), 0 16px 40px rgba(0, 0, 0, .45)
+    }
+
+    #quotaPop {
+      box-shadow: var(--glass), 0 16px 40px rgba(0, 0, 0, .45)
+    }
+
+    .turn-tip {
+      box-shadow: var(--glass), 0 14px 34px rgba(0, 0, 0, .45)
+    }
+
+    .add-sel {
+      box-shadow: var(--glass), 0 6px 18px rgba(0, 0, 0, .3)
+    }
+
+    /* the message box: the strongest light, a faint ring and the drop shadow under it */
+    .composer,
+    .composer:focus-within {
+      box-shadow: 0 0 0 5px rgba(255, 255, 255, .025), var(--glass-strong), 0 10px 18px rgba(0, 0, 0, .3)
+    }
+
+    :root[data-theme="light"] .composer,
+    :root[data-theme="light"] .composer:focus-within {
+      box-shadow: 0 0 0 5px rgba(0, 0, 0, .025), var(--glass-strong), 0 8px 18px rgba(0, 0, 0, .06)
+    }
+
+    /* surfaces whose children paint over their top edge (the file panel, the settings sidebar) get the same
+       highlight as a thin overlay that lets clicks through */
+    .set-dialog {
+      position: relative
+    }
+
+    .set-dialog::before {
+      display: none
+    }
+
+    /* table header cells sit on the card's top edge: the line goes on them */
+    .md .tbl-scroll th {
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .15)
+    }
+
+    :root[data-theme="light"] .md .tbl-scroll th {
+      box-shadow: inset 0 1px 0 rgba(0, 0, 0, .08)
+    }
+
+    /* ---------- top-left corner: sidebar button, search, "continue from a session file" ---------- */
+    .top-tools {
+      display: flex;
+      align-items: center;
+      gap: 2px
+    }
+
+    @media (min-width:761px) {
+      .top-tools {
+        position: fixed;
+        top: 5px;
+        left: 40px;
+        z-index: 32
+      }
+
+      body.collapsed header {
+        padding-left: 108px              /* room for the three buttons */
+      }
+    }
+
+    .search-box {
+      display: none                      /* replaced by the search button and the box it opens */
+    }
+
+    /* the quota ring under the composer: smaller */
+    .quota-ring {
+      width: 14px;
+      height: 14px
+    }
+
+    .c-bar .quota-ring {
+      margin: 0 6px
+    }
+
+    /* the signed-in user, in Settings */
+    .set-card .who {
+      flex: none;
+      padding: 0
+    }
+
+    .set-card .who-name,
+    .set-val {
+      color: var(--text2);
+      font-size: 13px
+    }
+
+    /* search box over the chat (like a command palette) */
+    .pal {
+      position: fixed;
+      inset: 0;
+      z-index: 60
+    }
+
+    .pal-box {
+      position: absolute;
+      top: 14vh;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(560px, calc(100vw - 32px));
+      max-height: min(520px, 72vh);
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      border: 1px solid var(--line2);
+      border-radius: 14px;
+      box-shadow: var(--glass), 0 24px 60px rgba(0, 0, 0, .5);
+      overflow: hidden
+    }
+
+    .pal-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 14px 11px 16px;
+      border-bottom: 1px solid var(--line)
+    }
+
+    .pal-head svg {
+      width: 16px;
+      height: 16px;
+      flex: none;
+      color: var(--muted)
+    }
+
+    .pal-head input {
+      flex: 1;
+      min-width: 0;
+      background: none;
+      border: 0;
+      outline: 0;
+      color: var(--text);
+      font: inherit;
+      font-size: 14px
+    }
+
+    .pal-head input::placeholder {
+      color: var(--muted)
+    }
+
+    .pal-list {
+      overflow: auto;
+      padding: 6px
+    }
+
+    .pal-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 33px;
+      padding: 0 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13.5px;
+      color: var(--text)
+    }
+
+    .pal-row.hi {
+      background: var(--hover)
+    }
+
+    .pal-row .pi {
+      width: 15px;
+      height: 15px;
+      flex: none;
+      color: var(--muted)
+    }
+
+    .pal-row .pt {
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap
+    }
+
+    .pal-row .pf {
+      flex: 0 100 auto;
+      min-width: 0;
+      margin-right: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden
+    }
+
+    .pal-row .pf svg {
+      width: 14px;
+      height: 14px;
+      flex: none
+    }
+
+    .pal-row .pw {
+      flex: none;
+      color: var(--muted);
+      font-size: 12px
+    }
+
+    .pal-row mark {
+      background: color-mix(in srgb, var(--accent) 30%, transparent);
+      color: inherit;
+      border-radius: 2px
+    }
+
+    .pal-empty {
+      padding: 18px 12px;
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    /* ---------- chips for Jira tickets and Confluence pages ---------- */
+    a.aref {
+      display: inline-flex;
+      align-items: center;
+      vertical-align: -.28em;
+      line-height: 1.3;
+      padding: 2px 9px 2px 7px;
+      border: 1px solid color-mix(in srgb, #2684FF 32%, var(--line));
+      border-radius: 7px;
+      background: color-mix(in srgb, #2684FF 12%, var(--surface2));
+      color: var(--text);
+      font-size: .93em;
+      text-decoration: none;
+      white-space: nowrap
+    }
+
+    a.aref:hover {
+      background: color-mix(in srgb, #2684FF 22%, var(--surface2));
+      border-color: #2684FF
+    }
+
+    a.aref .ai {
+      display: inline-flex;
+      flex: none;
+      margin-right: 6px;
+      user-select: none
+    }
+
+    a.aref .ai svg {
+      display: block;
+      width: 14px;
+      height: 14px
+    }
+
+    /* ---------- your message: formatted ---------- */
+    .msg.user .bubble code {
+      font: .86em var(--mono-font);
+      padding: 1px 5px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface2);
+      color: #e1ccb5
+    }
+
+    :root[data-theme="light"] .msg.user .bubble code {
+      color: #9a5b25
+    }
+
+    .msg.user .bubble strong {
+      font-weight: 460
+    }
+
+    .msg.user .bubble a:not(.aref) {
+      color: var(--accent);
+      text-underline-offset: 2px
+    }
+
+    .msg.user .bubble pre.ub-pre {
+      margin: 6px 0;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--code);
+      overflow: auto;
+      white-space: pre
+    }
+
+    .msg.user .bubble pre.ub-pre code {
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--text2);
+      font-size: 12.5px
+    }
+
+    .msg.user .bubble code.fileref,
+    .msg.user .bubble code.fmiss {
+      padding: 1px 8px 1px 5px;
+      white-space: nowrap
+    }
+
+    .msg.user .bubble code.fileref {
+      background: color-mix(in srgb, var(--accent) 12%, var(--surface2));
+      border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+      color: var(--text);
+      cursor: pointer
+    }
+
+    .msg.user .bubble code.fmiss {
+      border-style: dashed;
+      color: var(--muted)
+    }
+
+    /* ---------- the message box shows the same formatting while you type ---------- */
+    .in-wrap {
+      position: relative;
+      width: 100%
+    }
+
+    .in-mirror,
+    .in-wrap textarea {
+      box-sizing: border-box;
+      width: 100%;
+      margin: 0;
+      padding: 2px 4px 4px 0;
+      border: 0;
+      font: inherit;
+      font-size: 14px;
+      line-height: 1.5;
+      letter-spacing: normal;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      word-break: normal
+    }
+
+    .in-mirror {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      color: var(--text)
+    }
+
+    :root:not([data-theme="light"]) .in-mirror {
+      color: #ffffff
+    }
+
+    .in-wrap textarea {
+      position: relative;
+      display: block;
+      background: transparent;
+      color: transparent;
+      caret-color: var(--text)
+    }
+
+    .in-wrap textarea::selection {
+      background: color-mix(in srgb, var(--accent) 40%, transparent)
+    }
+
+    .mi-code {
+      color: #e1ccb5;
+      background: rgba(255, 255, 255, .08);
+      border-radius: 4px
+    }
+
+    :root[data-theme="light"] .mi-code {
+      color: #9a5b25;
+      background: rgba(0, 0, 0, .06)
+    }
+
+    .mi-b {
+      text-shadow: .45px 0 0 currentColor
+    }
+
+    .mi-file {
+      color: #8fd1a8;
+      text-decoration: underline dotted;
+      text-underline-offset: 2px
+    }
+
+    :root[data-theme="light"] .mi-file {
+      color: #1d7a45
+    }
+
+    .mi-ref,
+    .mi-url {
+      color: #5aa2ff;
+      text-decoration: underline;
+      text-decoration-color: color-mix(in srgb, #5aa2ff 45%, transparent);
+      text-underline-offset: 2px
+    }
+
+    /* ---------- scratch notes (pencil) and memory (memorized) ---------- */
+    .ec-state svg {
+      width: 14px;
+      height: 14px;
+      vertical-align: -2px;
+      margin-right: 5px
+    }
+
+    .edit-card.gem-memory .ec-state svg {
+      color: var(--accent)
+    }
+
+    /* ---------- tighter spacing around steps and edits ---------- */
+    .tools-head {
+      padding: 4px 10px 4px 6px
+    }
+
+    .tools.folded:not(.open) {
+      margin-bottom: 4px
+    }
+
+    .md + .tools {
+      margin-top: 4px
+    }
+
+    .edit-card {
+      margin: 4px 0
+    }
+
+    .ec-head {
+      padding: 4px 8px
+    }
+
+    /* ---------- suggested replies: as round as the other controls, no primary colour ---------- */
+    .quick-btn {
+      padding: 6px 14px;
+      border-radius: 999px
+    }
+
+    .quick-btn:hover {
+      border-color: var(--line2);
+      background: var(--hover)
+    }
+
+    .quick-btn:focus-visible {
+      outline: 0;
+      border-color: var(--text2)
+    }
+
+    /* ---------- the file filter floats over the tree, rounded ---------- */
+    .fx-filter {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      top: 36px;
+      z-index: 4;
+      margin: 0;
+      height: 32px;
+      border-radius: 999px;
+      border-color: var(--line2);
+      background: var(--surface);
+      box-shadow: var(--glass), 0 8px 20px rgba(0, 0, 0, .35)
+    }
+
+    .ftree {
+      padding-top: 44px
+    }
+
+    /* ---------- the quota ring: centred, with a track you can see ---------- */
+    .quota-ring svg {
+      width: 100%;
+      height: 100%
+    }
+
+    .quota-ring .track {
+      stroke: color-mix(in srgb, var(--text) 24%, transparent)
+    }
+
+    .quota-ring .track,
+    .quota-ring .fill {
+      stroke-width: 4.6
+    }
+
+    /* ---------- the stop button, while the run is being stopped ---------- */
+    .send.stopping {
+      cursor: progress
+    }
+
+    .stop-spin {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, .4);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: dlSpin .75s linear infinite
+    }
+
+    /* ---------- no folder yet: the pill above the message box asks for one ---------- */
+    #browse.need {
+      background: var(--surface2);
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--line2)
+    }
+
+    main.fresh .composer-wrap {
+      display: flex;
+      flex-direction: column
+    }
+
+    main.fresh .composer-wrap > .composer,
+    main.fresh .composer-wrap > .pills {
+      width: 100%
+    }
+
+    main.fresh .under-row {
+      order: -1;
+      width: 100%;
+      margin: 0 auto 10px
+    }
+
+    /* ---------- Settings -> Usage ---------- */
+    .use-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 24px 0 8px
+    }
+
+    .use-head h3 {
+      margin: 0
+    }
+
+    .set-card .use-row {
+      padding: 13px 14px;
+      gap: 18px
+    }
+
+    .use-main {
+      flex: 1;
+      min-width: 0
+    }
+
+    .use-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 13px
+    }
+
+    .use-name {
+      color: var(--text)
+    }
+
+    .use-tag {
+      margin-left: 8px;
+      padding: 0 8px;
+      border: 1px solid var(--line2);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 11px
+    }
+
+    .use-pct {
+      color: var(--text2);
+      font-variant-numeric: tabular-nums
+    }
+
+    .use-bar {
+      height: 6px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--text) 14%, transparent);
+      overflow: hidden
+    }
+
+    .use-bar i {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: var(--accent-grad)
+    }
+
+    .use-row.warn .use-bar i {
+      background: #e8a33d
+    }
+
+    .use-row.low .use-bar i {
+      background: #ff6b6b
+    }
+
+    .use-reset {
+      flex: none;
+      min-width: 96px;
+      text-align: right;
+      color: var(--muted);
+      font-size: 12.5px;
+      font-variant-numeric: tabular-nums
+    }
+
+    .set-foot {
+      margin: 10px 2px 0;
+      color: var(--muted);
+      font-size: 12px
+    }
+
+    /* Gemini's own notes sit inside the steps: hidden while the steps are folded, a row with its diff once opened */
+    .tools.folded:not(.open) .edit-card {
+      display: none
+    }
+
+    .tools .step.has-edit {
+      display: none
+    }
+
+    /* ---------- Settings -> Usage: one card per model tier ---------- */
+    .use-tier {
+      margin-top: 22px !important
+    }
+
+    /* ---------- lists, headings and quotes in your message ---------- */
+    .msg.user .bubble ul.ub-list,
+    .msg.user .bubble ol.ub-list {
+      margin: 3px 0;
+      padding-left: 22px
+    }
+
+    .msg.user .bubble ul.ub-list ul.ub-list,
+    .msg.user .bubble ul.ub-list ol.ub-list,
+    .msg.user .bubble ol.ub-list ul.ub-list {
+      margin: 1px 0
+    }
+
+    .msg.user .bubble .ub-list li {
+      margin: 1px 0;
+      padding-left: 2px
+    }
+
+    .msg.user .bubble .ub-list li::marker {
+      color: var(--muted)
+    }
+
+    .msg.user .bubble .ub-h {
+      margin: 6px 0 2px;
+      font-weight: 460
+    }
+
+    .msg.user .bubble .ub-q {
+      margin: 3px 0;
+      padding-left: 10px;
+      border-left: 3px solid var(--line2);
+      color: var(--text2)
+    }
+
+    .msg.user .bubble em {
+      font-style: italic
+    }
+
+    /* the same pieces while typing (colours only, so nothing shifts) */
+    .mi-mark {
+      color: var(--accent)
+    }
+
+    .mi-h {
+      text-shadow: .45px 0 0 currentColor
+    }
+
+    .mi-q {
+      color: var(--muted)
+    }
+
+    .mi-s {
+      text-decoration: line-through;
+      color: var(--muted)
+    }
+
+    .mi-i {
+      color: #cfd3ff
+    }
+
+    :root[data-theme="light"] .mi-i {
+      color: #4a4fd1
+    }
+
+    /* ---------- links and files: just a coloured icon, no chip background or border ---------- */
+    a.aref,
+    code.fileref,
+    code.fmiss,
+    .msg.user .bubble code.fileref,
+    .msg.user .bubble code.fmiss,
+    .md code.fileref,
+    .md code.fmiss {
+      background: none !important;
+      border: 0 !important;
+      padding: 0 2px !important;
+      border-radius: 0
+    }
+
+    a.aref:hover,
+    code.fileref:hover {
+      background: none !important;
+      text-decoration: underline;
+      text-underline-offset: 3px
+    }
+
+    code.fmiss:hover {
+      background: none !important
+    }
+
+    a.aref .ai svg {
+      width: 15px;
+      height: 15px
+    }
+
+    code .fi > svg {
+      width: 15px;
+      height: 15px
+    }
+
+    /* tight window: the panel floats over the chat, so it keeps a shadow */
+    @media (min-width:761px) and (max-width:1100px) {
+      #diffPanel {
+        box-shadow: -10px 0 36px rgba(0, 0, 0, .4)
+      }
+    }
+
+    /* wide window: the panel joins the chat's surface, its head (Changes / Files, the tabs) up in the strip */
+    @media (min-width:1101px) {
+      #diffPanel {
+        margin: 38px 8px 8px 0
+      }
+
+      body:has(#diffPanel.open):not(.panel-max) main {
+        margin-right: 0;
+        border-right: 0;
+        border-radius: 10px 0 0 10px
+      }
+
+      body:has(#diffPanel.open):not(.panel-max) #chat {
+        border-top-right-radius: 0
+      }
+
+      body:has(#diffPanel.open):not(.panel-max) main:not(.fresh) .composer-wrap {
+        border-bottom-right-radius: 0
+      }
+
+      body:has(#diffPanel.open):not(.panel-max) #diffPanel {
+        border-radius: 0 10px 10px 0
+      }
+
+      #diffPanel .dp-head {
+        position: absolute;
+        top: -39px;
+        left: -1px;
+        right: -1px;
+        height: 38px;
+        padding: 0 4px 0 12px;
+        border: 0;
+        background: transparent
+      }
+
+      body.panel-max #diffPanel {
+        margin: 38px 8px 8px 0;
+        border: 1px solid var(--line);
+        border-radius: 10px
+      }
+
+      body.collapsed.panel-max #diffPanel {
+        margin-left: 8px
+      }
+    }
+
+    @media (max-width:760px) {
+      main {
+        margin: 0;
+        border: 0;
+        border-radius: 0
+      }
+
+      header {
+        position: static;
+        height: auto;
+        padding: 10px 12px
+      }
+
+      main.fresh header {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: auto
+      }
+
+      .top-right #branchPill {
+        display: none
+      }
+
+      #chat,
+      main:not(.fresh) .composer-wrap {
+        border-radius: 0
+      }
+
+      aside {
+        background: var(--surface)
+      }
+
+      #diffPanel,
+      #diffPanel.files {
+        margin: 0
+      }
+    }
+
     @media (max-width:760px) {
     /* phone width: the panel covers the whole window (the Files tab's own width rule must not win here) */
     #diffPanel,
@@ -5725,13 +8617,24 @@
       }
 
       main:not(.fresh) .composer-wrap {
-        padding: 12px 16px 22px 28px
+        padding: 12px 16px 22px 16px
       }
 
       .chips {
         grid-template-columns: 1fr
       }
     }
+
+    /* Native Auto Code Theme (matches UI colors) */
+    .hl-auto .hljs { background: transparent; color: var(--text); }
+    .hl-auto .hljs-keyword, .hl-auto .hljs-selector-tag, .hl-auto .hljs-section, .hl-auto .hljs-name { color: var(--accent); font-weight: 430; }
+    .hl-auto .hljs-comment, .hl-auto .hljs-quote, .hl-auto .hljs-meta { color: var(--muted); font-style: italic; }
+    .hl-auto .hljs-string, .hl-auto .hljs-type, .hl-auto .hljs-built_in, .hl-auto .hljs-builtin-name, .hl-auto .hljs-addition { color: var(--text2); }
+    .hl-auto .hljs-variable, .hl-auto .hljs-template-variable, .hl-auto .hljs-attribute { color: var(--accent); opacity: 0.9; }
+    .hl-auto .hljs-number, .hl-auto .hljs-literal, .hl-auto .hljs-symbol, .hl-auto .hljs-bullet, .hl-auto .hljs-link { color: var(--text2); font-weight: 350; }
+    .hl-auto .hljs-deletion { color: var(--git-del); }
+    /* Robot Framework: the names of tests and keywords (first cell, not indented) are bold, in the full text colour */
+    .hl-auto .hljs-title.robot_ { color: var(--text); font-weight: 430; }
   </style>
 </head>
 
@@ -5763,15 +8666,14 @@
   <aside id="side">
     <div class="resizer" id="resizer" title="Drag to resize · double-click to reset"></div>
     <div class="brand">
-      <div class="brand-actions">
-        <button class="side-act" id="newChat" title="New chat"><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" d="M12 5v14M5 12h14"/></svg><span>New chat</span></button>
-        <input type="file" id="importFile" accept=".json,.jsonl,application/json" hidden>
-      </div>
-      <button class="icon-btn" id="importSession" title="Continue from a session file (.json / .jsonl)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg></button>
       <button class="icon-btn" id="collapse" title="Close sidebar"><svg viewBox="0 0 24 24">
           <rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.8" />
           <path d="M9 4v16" stroke="currentColor" stroke-width="1.8" />
         </svg></button>
+      <span class="brand-gap"></span>
+    </div>
+    <div class="new-row">
+      <button class="side-act" id="newChat" title="New chat"><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" d="M12 5v14M5 12h14"/></svg><span>New chat</span></button>
     </div>
     <div class="search-box">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.9"/>
@@ -5780,89 +8682,53 @@
       <kbd id="searchKbd">Ctrl K</kbd>
       <button id="searchClear" title="Clear" hidden>✕</button>
     </div>
-    <div class="label"><button class="auto-toggle" id="autoToggle" hidden></button></div>
+    <div class="label"><span class="lbl-t">Projects</span><button class="auto-toggle" id="autoToggle" hidden></button></div>
     <div class="sessions" id="sessions"></div>
     <div class="side-foot">
-      <div class="who" id="who" hidden><span class="who-name" id="whoName"></span></div>
       <button class="icon-btn" id="settingsBtn" title="Settings">
         <svg viewBox="0 0 24 24" fill="none">
           <path stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
             d="M20.35 8.92l-.37-.2a2.6 2.6 0 0 1-.78-.73c-.16-.28-.24-.6-.24-.93l.01-.96c.01-.68.02-1.02-.08-1.33a1.7 1.7 0 0 0-.42-.74c-.21-.24-.51-.41-1.11-.75l-.49-.29c-.6-.34-.89-.51-1.2-.58a1.8 1.8 0 0 0-.84 0c-.31.07-.6.25-1.19.6l-.35.21c-.06.04-.09.05-.12.07-.28.15-.59.24-.91.25h-.26c-.32-.01-.63-.1-.91-.25l-.12-.07-.36-.21c-.59-.36-.88-.53-1.2-.6a1.8 1.8 0 0 0-.85 0c-.31.06-.61.24-1.2.58l-.49.28c-.59.34-.88.51-1.1.75-.18.21-.32.46-.41.73-.09.31-.09.65-.08 1.33l.01.43c0 .06 0 .09 0 .13a2.6 2.6 0 0 1-.24.92c-.01.03-.03.06-.06.11-.03.06-.05.08-.06.11a2.6 2.6 0 0 1-.74.77l-.11.06-.36.2c-.6.33-.9.5-1.12.74-.2.21-.34.46-.43.73-.1.31-.1.65-.1 1.34v.56c0 .68.01 1.02.11 1.33.09.27.23.51.43.72.22.24.51.4 1.11.73l.36.2.12.07c.27.16.5.39.67.66l.07.12.07.12c.14.28.22.59.23.9v.14l-.01.41c-.01.69-.01 1.03.08 1.34.09.27.23.52.42.73.21.24.51.41 1.11.75l.49.29c.59.34.89.51 1.2.58.28.06.57.05.85-.01.31-.07.6-.25 1.19-.6l.35-.21c.06-.04.09-.05.12-.07.28-.15.59-.24.91-.25h.26c.32.01.63.1.91.25l.09.06.38.22c.59.36.88.53 1.2.6.28.07.57.07.85.01.31-.07.61-.24 1.2-.58l.5-.29c.58-.34.88-.51 1.09-.75.19-.21.33-.46.41-.73.1-.31.09-.65.08-1.32l-.01-.44v-.13c0-.32.08-.63.24-.92l.06-.11.07-.11c.17-.27.4-.5.68-.66l.11-.06.36-.2c.6-.34.9-.5 1.12-.74.19-.21.34-.46.43-.73.1-.3.1-.64.1-1.32v-.57c0-.68 0-1.03-.1-1.33a1.8 1.8 0 0 0-.43-.73c-.22-.23-.52-.4-1.11-.73z" />
           <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7" />
         </svg>
+        <span>Settings</span>
       </button>
-      <div id="settings">
-        <div class="head">Settings</div>
-        <div class="set-row">
-          <span class="set-label">Primary color</span>
-          <span class="set-color">
-            <button id="primaryReset" class="set-reset" title="Back to the default color">Reset</button>
-            <input type="color" id="primaryColor" class="color-circle">
-          </span>
-        </div>
-        <div class="set-row">
-          <span class="set-label">Folder access</span>
-          <button id="accessManage" class="set-reset" title="Which folders outside this project Gemini may use">Manage</button>
-        </div>
-        <div class="set-row">
-          <span class="set-label">Theme</span>
-          <div class="seg" id="themeSeg">
-            <button data-theme="dark" title="Dark"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></button><button data-theme="light" title="Light"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></button>
-          </div>
-        </div>
-        <div class="set-row" id="darkerRow">
-          <span class="set-label" title="A near-black page for dark mode">Darker background</span>
-          <button class="switch" id="darkerSwitch" title="Use a darker background in dark mode"></button>
-        </div>
-        <div class="set-row">
-          <span class="set-label" id="notifyNote" title="">Notifications</span>
-          <button class="switch" id="notifySwitch" title="Notify me when Gemini finishes"></button>
-        </div>
-        <hr>
-        <div class="set-row stack">
-          <span class="set-label">Interface font</span>
-          <select id="uiFont"></select>
-        </div>
-        <div class="set-row stack">
-          <span class="set-label">Code font</span>
-          <select id="monoFont"></select>
-        </div>
-        <div class="set-row stack">
-          <span class="set-label">Code theme</span>
-          <select id="codeTheme"></select>
-        </div>
-        <div class="set-row stack">
-          <span class="set-label">Voice input language</span>
-          <select id="dictLang">
-            <option value="en-US">English (US)</option>
-            <option value="en-GB">English (UK)</option>
-            <option value="fr-FR">Français</option>
-            <option value="ar-SA">العربية</option>
-            <option value="es-ES">Español</option>
-            <option value="de-DE">Deutsch</option>
-            <option value="it-IT">Italiano</option>
-            <option value="pt-PT">Português</option>
-            <option value="">Browser default</option>
-          </select>
-        </div>
-        <div class="set-row stack">
-          <span class="set-label">Chat width</span>
-          <select id="chatWidth">
-            <option value="760px">Narrow</option>
-            <option value="940px">Default</option>
-            <option value="1200px">Wide</option>
-            <option value="1500px">Extra wide</option>
-            <option value="100%">Full width</option>
-          </select>
-        </div>
-      </div>
+
     </div>
   </aside>
   <div class="side-edge" id="sideEdge"></div>
   <div class="scrim" id="scrim"></div>
 
   <main>
-    <div class="top-right">
+    
+    <header id="header">
+      <button class="icon-btn menu-btn" id="menu" title="Toggle sidebar (Ctrl+B)">
+        <svg viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <path d="M9 4v16" stroke="currentColor" stroke-width="1.8" />
+        </svg>
+      </button>
+      <div class="top-tools" id="topTools">
+        <button class="icon-btn" id="searchBtn" title="Search chats (Ctrl+K)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></button>
+              <input type="file" id="importFile" accept=".json,.jsonl,application/json" hidden>
+        <button class="icon-btn" id="importSession" title="Continue from a session file (.json / .jsonl)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg></button>
+      </div>
+      <div class="header-title" id="headerTitleArea">
+        <span id="headerCwdLabel" class="cwd-text"></span>
+        <span class="sep" id="headerSep">/</span>
+        <span id="headerTitleLabel" class="title-text">New Chat</span>
+      </div>
+      <div class="top-right">
+        
+        <button class="pill ghost-pill" id="branchPill" title="Git Branch" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 3v12" />
+            <circle cx="18" cy="6" r="3" />
+            <circle cx="6" cy="18" r="3" />
+            <path d="M18 9a9 9 0 0 1-9 9" />
+          </svg>
+          <span class="v" id="branchLabel"></span>
+        </button>
       <button class="icon-btn" id="filesBtn" title="Browse the folder's files">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" /></svg>
       </button>
@@ -5879,13 +8745,6 @@
         <span class="badge" id="changesLabel"></span>
       </button>
     </div>
-    <header id="header">
-      <button class="icon-btn menu-btn" id="menu" title="Open sidebar (Ctrl+B)">
-        <svg viewBox="0 0 24 24">
-          <rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.8" />
-          <path d="M9 4v16" stroke="currentColor" stroke-width="1.8" />
-        </svg>
-      </button>
     </header>
 
     <div id="chat">
@@ -5911,35 +8770,14 @@
       </button>
       </div>
       <div class="composer">
+        <div class="in-wrap"><div class="in-mirror" id="inMirror" aria-hidden="true"></div><textarea id="input" rows="1" placeholder="Ask anything, / for actions"></textarea></div>
+        <div class="c-bar">
         <button class="clip" id="attachBtn" title="Attach files for Gemini to read">
           <svg viewBox="0 0 24 24">
             <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5v14M5 12h14" />
           </svg>
         </button>
-        <textarea id="input" rows="1" placeholder="Message Gemini"></textarea>
-        <button class="clip mic" id="micBtn" title="Voice input: speak to type (click again to stop)" hidden>
-          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
-        </button>
-        <button class="send" id="send" disabled title="Send"></button>
-      </div>
-      <div id="quotaPop">
-      <div class="qhead">Daily quota
-        <button class="icon-btn" id="quotaRefresh" title="Refresh">
-          <svg viewBox="0 0 24 24">
-            <path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"
-              d="M20 11a8 8 0 1 0-2.3 5.7M20 4v6h-6" />
-          </svg>
-        </button>
-      </div>
-      <div id="quotaBody"></div>
-    </div>
-      <div class="under-row">
-        <button class="pill" id="browse" title="Working directory">
-          <svg>
-            <use href="#i-folder" />
-          </svg><span class="v" id="cwdLabel">Choose folder</span>
-        </button>
-        <label class="pill" id="approvalPill" title="Approval mode (Shift+Tab to switch)">
+                <label class="pill" id="approvalPill" data-tip="Approval mode  ·  Shift+Tab">
           <svg viewBox="0 0 24 24" id="approvalIcon"></svg>
           <span class="v" id="approvalLabel"></span>
           <select id="approval">
@@ -5948,7 +8786,8 @@
             <option value="plan">Plan</option>
           </select>
         </label>
-      <label class="pill ghost-pill" title="Model">
+        <span class="c-gap"></span>
+        <label class="pill ghost-pill" id="modelPill" data-tip="Select model">
           <span class="v" id="modelLabel"></span>
           <select id="model">
             <!-- Fallback only: replaced by the live list from /api/models (your quota + the CLI's auto aliases). -->
@@ -5967,6 +8806,7 @@
             </optgroup>
           </select>
         </label>
+      
         <button class="quota-ring" id="quotaPill" title="Daily model quota" hidden>
           <svg viewBox="0 0 36 36">
             <circle class="track" cx="18" cy="18" r="15.5" fill="none" stroke-width="3.6" />
@@ -5974,7 +8814,31 @@
               stroke-linecap="round" transform="rotate(-90 18 18)" />
           </svg>
         </button>
+        <button class="clip mic" id="micBtn" title="Voice input: speak to type (click again to stop)" hidden>
+          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
+        </button>
+        <button class="send" id="send" disabled title="Send"></button>
+        </div>
       </div>
+      <div id="quotaPop">
+      <div class="qhead">Daily quota
+        <button class="icon-btn" id="quotaRefresh" title="Refresh">
+          <svg viewBox="0 0 24 24">
+            <path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"
+              d="M20 11a8 8 0 1 0-2.3 5.7M20 4v6h-6" />
+          </svg>
+        </button>
+      </div>
+      <div id="quotaBody"></div>
+    </div>
+      <div class="under-row">
+        <button class="pill" id="browse" title="Working directory">
+          <svg>
+            <use href="#i-folder" />
+          </svg><span class="v" id="cwdLabel">Choose folder</span>
+        </button>
+      </div>
+      
     </div>
   </main>
 
@@ -5985,6 +8849,7 @@
         <button data-tab="changes" class="on">Changes</button>
         <button data-tab="files">Files</button>
       </div>
+      <div class="fx-tabs" id="fxTabs"></div>
       <span class="dp-title" id="diffTitle"></span>
       <span class="dp-status" id="diffStatus"></span>
       <button class="icon-btn on" hidden id="fxTreeToggle" title="Show or hide the files">
@@ -6010,6 +8875,7 @@
     <div class="files-body" id="filesBody" hidden>
       <div class="fx-main">
         <div class="fx-side" id="fxSide">
+          <div class="fx-title">Workspace</div>
           <label class="fx-filter">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
             <input id="fxFilter" placeholder="Filter files" autocomplete="off" spellcheck="false">
@@ -6019,7 +8885,7 @@
         </div>
         <div class="fview" id="fileView">
           <div class="fv-head" id="fvHead" hidden>
-            <div class="fx-tabs" id="fxTabs"></div>
+          <div class="fv-crumbs" id="fvCrumbs" hidden></div>
             <button class="fv-toggle" id="fvMode" hidden>Preview</button>
             <button class="fv-toggle" id="fvWrap" title="Wrap long lines">Wrap</button>
             <button class="icon-btn" id="fxFind" title="Find in file (Ctrl+F)">
@@ -6042,6 +8908,154 @@
       </div>
     </div>
   </section>
+
+  <div class="set-modal" id="settings" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="set-dialog">
+      <nav class="set-nav">
+        <div class="set-nav-h">Settings</div>
+        <button class="on" data-sec="general">General</button>
+        <button data-sec="appearance">Appearance</button>
+        <button data-sec="usage">Usage</button>
+        <div class="set-nav-acc" id="accountSec" hidden>
+          <div class="set-acc-card" id="who">
+            <!-- <div class="set-acc-avatar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
+            </div> -->
+            <div class="set-acc-info">
+              <div class="set-acc-name" id="whoName"></div>
+            </div>
+          </div>
+        </div>
+      </nav>
+      <div class="set-main">
+        <button class="icon-btn set-close" id="settingsClose" title="Close (Esc)"><svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M7 7l10 10M17 7 7 17" /></svg></button>
+        <section class="set-sec" data-sec="general">
+          <h2>General</h2>
+          <p class="set-sub">How Gemini Studio behaves.</p>
+          <h3>Notifications</h3>
+          <p class="set-sec-desc">Desktop alerts for finished responses.</p>
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-label">
+                <span class="set-label-text" id="notifyNote" title="">Notifications</span>
+                <span class="set-desc">Alert when Gemini completes a task while this tab is backgrounded.</span>
+              </div>
+              <button class="switch" id="notifySwitch" title="Notify me when Gemini finishes"></button>
+            </div>
+          </div>
+          <h3>Voice input</h3>
+          <p class="set-sec-desc">Speech recognition and dictation preferences.</p>
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-label">
+                <span class="set-label-text">Voice input language</span>
+                <span class="set-desc">Spoken language recognized when dictating with the microphone.</span>
+              </div>
+              <select id="dictLang" class="glass-btn">
+                <option value="en-US">English (US)</option>
+                <option value="en-GB">English (UK)</option>
+                <option value="fr-FR">Français</option>
+                <option value="ar-SA">العربية</option>
+                <option value="es-ES">Español</option>
+                <option value="de-DE">Deutsch</option>
+                <option value="it-IT">Italiano</option>
+                <option value="pt-PT">Português</option>
+                <option value="">Default</option>
+              </select>
+            </div>
+          </div>
+        </section>
+        <section class="set-sec" data-sec="usage" hidden>
+          <h2>Usage</h2>
+          <p class="set-sub">Today's requests for each model, as Google reports them.</p>
+          <div class="use-head"><h3>Daily quota</h3><button class="set-reset" id="usageRefresh" title="Fetch the numbers again">Refresh</button></div>
+          <div id="usageBody"></div>
+        </section>
+        <section class="set-sec" data-sec="appearance" hidden>
+          <h2>Appearance</h2>
+          <p class="set-sub">Theme, colours and fonts.</p>
+          <h3>Appearance</h3>
+          <p class="set-sec-desc">Customize theme mode, background darkness, accent color, and chat layout width.</p>
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-label">
+                <span class="set-label-text">Theme</span>
+                <span class="set-desc">Switch between dark and light appearance modes.</span>
+              </div>
+              <div class="seg glass-btn" id="themeSeg">
+                <button data-theme="dark" title="Dark"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></button><button data-theme="light" title="Light"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></button>
+              </div>
+            </div>
+            <div class="set-row" id="darkerRow">
+              <div class="set-label">
+                <span class="set-label-text">Darker background</span>
+                <span class="set-desc">Use a near-black palette in dark mode for extra contrast.</span>
+              </div>
+              <button class="switch" id="darkerSwitch" title="Use a darker background in dark mode"></button>
+            </div>
+            <div class="set-row">
+              <div class="set-label">
+                <span class="set-label-text">Primary color</span>
+                <span class="set-desc">Accent color for buttons, highlights, and active elements.</span>
+              </div>
+              <span class="set-color">
+                <button id="primaryReset" class="set-reset" title="Back to the default color">Reset</button>
+                <input type="color" id="primaryColor" class="color-circle">
+              </span>
+            </div>
+            <div class="set-row">
+              <div class="set-label">
+                <span class="set-label-text">Chat width</span>
+                <span class="set-desc">Maximum width of the conversation message stream.</span>
+              </div>
+              <select class="glass-btn" id="chatWidth">
+                <option value="760px">Narrow</option>
+                <option value="940px">Default</option>
+                <option value="1200px">Wide</option>
+                <option value="1500px">Extra wide</option>
+                <option value="100%">Full width</option>
+              </select>
+            </div>
+          </div>
+          <h3>Fonts</h3>
+          <p class="set-sec-desc">Typography and syntax highlighting for chat and file previews.</p>
+          <div class="set-card">
+            <div class="set-row">
+              <div class="set-label">
+                <span class="set-label-text">Interface font</span>
+                <span class="set-desc">Font used for menus, buttons, labels, and messages.</span>
+              </div>
+              <select id="uiFont" class="glass-btn"></select>
+            </div>
+            <div class="set-row">
+              <div class="set-label">
+                <span class="set-label-text">Code font</span>
+                <span class="set-desc">Monospace font for code blocks, file viewer, and diffs.</span>
+              </div>
+              <select id="monoFont" class="glass-btn"></select>
+            </div>
+            <div class="set-row">
+              <div class="set-label">
+                <span class="set-label-text">Code theme</span>
+                <span class="set-desc">Syntax highlighting color scheme for code snippets.</span>
+              </div>
+              <select id="codeTheme" class="glass-btn"></select>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="pal" id="palette" hidden>
+    <div class="pal-box" role="dialog" aria-label="Search chats">
+      <div class="pal-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+        <input id="palInput" type="text" placeholder="Search chats by name" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="pal-list" id="palList"></div>
+    </div>
+  </div>
 
   <div class="lightbox" id="lightbox"><img alt=""></div>
 
@@ -6101,6 +9115,12 @@
       set(k, v) {try {localStorage.setItem(k, JSON.stringify(v));} catch { } },
     };
     let nextPrompt = null;   // Gemini's "Next prompt" suggestion for the empty message box (see setNextPrompt)
+    // long chats are built in batches (see showOlderTurns)
+    const CHAT_PAGE = 15;
+    const OLD_TURN_ACTIONS = '.u-actions [data-a=retry], .u-actions [data-a=edit], .quick, .plan-card .pc-actions, .plan-card .pc-feedback';
+    let logTarget = null;            // set while building earlier turns: addUser / AssistantView put messages there
+    const logAppend = (el) => (logTarget || $('log')).appendChild(el);
+    let olderObserver = null;
     marked.setOptions({breaks: true, gfm: true});
     marked.use({renderer: {
       image(href, title, text) {
@@ -6143,8 +9163,171 @@
         })
         .replace(/@@DOLLAR@@/g, '$');
     }
+    // ---------- Jira tickets and Confluence pages ----------
+    // A Jira or Confluence link becomes a chip: the product's icon and the ticket key / page title. A bare ticket key
+    // (RICOMS-13719) is highlighted too once a Jira link has been seen (that gives the site and the project keys).
+    const ICON_JIRA = '<svg viewBox="0 0 24 24"><path fill="#2684FF" d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2.84a.84.84 0 0 0-.84-.84H11.53zM6.77 6.8a4.36 4.36 0 0 0 4.34 4.34h1.8v1.72a4.36 4.36 0 0 0 4.34 4.34V7.63a.84.84 0 0 0-.83-.83H6.77zM2 11.6c0 2.4 1.95 4.34 4.35 4.34h1.78v1.72c.01 2.39 1.95 4.34 4.34 4.34v-9.57a.84.84 0 0 0-.84-.83H2z"/></svg>';
+    const ICON_CONF = '<svg viewBox="0 0 24 24"><path fill="#2684FF" d="M2.3 17.4c-.2.3-.4.7-.6 1l-.4.7a.6.6 0 0 0 .2.8l4.2 2.6c.3.2.7.1.8-.2.2-.3.3-.5.5-.8 1.5-2.5 3-2.2 5.7-.9l4.1 1.9c.3.1.7 0 .8-.3l2-4.7a.6.6 0 0 0-.3-.8c-.9-.4-2.7-1.3-4.1-1.9-5.4-2.4-10-2.3-13.9 2.6zM21.7 6.6c.2-.3.4-.7.6-1l.4-.7a.6.6 0 0 0-.2-.8L18.3 1.5c-.3-.2-.7-.1-.8.2-.2.3-.3.5-.5.8-1.5 2.5-3 2.2-5.7.9L7.2 1.5c-.3-.1-.7 0-.8.3l-2 4.7a.6.6 0 0 0 .3.8c.9.4 2.7 1.3 4.1 1.9 5.4 2.4 10 2.3 13.9-2.6z"/></svg>';
+    const ICON_WB = '<svg viewBox="0 0 24 24" fill="none" stroke="#2684FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21l4-4 4 4M7.5 12.5c1.5-3 3-3 4 0s2.5 2.5 4.5-1"/></svg>';
+    const refIcon = (k) => k === 'jira' ? ICON_JIRA : k === 'wb' ? ICON_WB : ICON_CONF;
+    const JIRA_KEY = /^[A-Z][A-Z0-9_]+-\d+$/;
+    function jiraInfo() { const j = store.get('gui.jira', null); return j && j.base ? j : {base: '', keys: []}; }
+    function refFromUrl(href) {
+      let u; try { u = new URL(href); } catch { return null; }
+      if (!/^https?:$/.test(u.protocol)) return null;
+      const path = decodeURIComponent(u.pathname.replace(/\+/g, ' '));
+      let m = path.match(/\/browse\/([A-Z][A-Z0-9_]+-\d+)/) || path.match(/\/issues\/([A-Z][A-Z0-9_]+-\d+)/)
+        || (u.searchParams.get('selectedIssue') || '').match(/^([A-Z][A-Z0-9_]+-\d+)$/);
+      if (m) {
+        const j = jiraInfo(), key = m[1], prefix = key.replace(/-\d+$/, '');
+        if (j.base !== u.origin || !j.keys.includes(prefix)) store.set('gui.jira', {base: u.origin, keys: [...new Set([...(j.base === u.origin ? j.keys : []), prefix])].slice(-30)});
+        return {kind: 'jira', label: key};
+      }
+      if (/\/whiteboards?\/[^/]+/.test(path)) return {kind: 'wb', label: 'Whiteboard'};
+      m = path.match(/\/wiki\/spaces\/[^/]+\/pages\/\d+(?:\/([^/]+))?/) || path.match(/\/display\/[^/]+\/([^/]+)/);
+      if (m) return {kind: 'conf', label: (m[1] || 'Confluence page').trim()};
+      if (/\/wiki\/x\//.test(path)) return {kind: 'conf', label: 'Confluence page'};
+      return null;
+    }
+    function refChip(kind, label, href) {
+      const a = document.createElement('a');
+      a.className = 'aref ' + kind; a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.title = href;
+      a.innerHTML = '<span class="ai">' + refIcon(kind) + '</span>';
+      a.append(label);
+      return a;
+    }
+    // chips for the links in a rendered reply, and for bare keys of known Jira projects
+    function linkTickets(root) {
+      root.querySelectorAll('a[href]').forEach(a => {
+        if (a.classList.contains('aref') || a.closest('pre')) return;
+        const ref = refFromUrl(a.href); if (!ref) return;
+        const t = a.textContent.trim(), label = (!t || /^https?:\/\//.test(t)) ? ref.label : t;
+        a.className = 'aref ' + ref.kind; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.title = a.href;
+        a.innerHTML = '<span class="ai">' + refIcon(ref.kind) + '</span>'; a.append(label);
+      });
+      const j = jiraInfo(); if (!j.base) return;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {acceptNode: (n) =>
+        n.parentElement.closest('a, code, pre, .aref, .fi') || !/[A-Z][A-Z0-9_]+-\d+/.test(n.nodeValue) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT});
+      const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+      nodes.forEach(n => {
+        const parts = n.nodeValue.split(/\b([A-Z][A-Z0-9_]+-\d+)\b/);
+        if (parts.length < 2) return;
+        const frag = document.createDocumentFragment(); let any = false;
+        parts.forEach((part, i) => {
+          if (i % 2 && j.keys.includes(part.replace(/-\d+$/, ''))) { frag.append(refChip('jira', part, j.base + '/browse/' + part)); any = true; }
+          else if (part) frag.append(part);
+        });
+        if (any) n.replaceWith(frag);
+      });
+    }
+    // Your own message: `code`, **bold**, ``` blocks, links and ticket keys are shown formatted (all built as DOM
+    // nodes from the text, so nothing you type can inject markup).
+    function inlineMd(seg, parent) {
+      const re = /`([^`\n]+)`|\*\*([^*\n]+)\*\*|~~([^~\n]+)~~|(?<![*\w])\*([^*\s][^*\n]*?)\*(?![*\w])|(https?:\/\/[^\s<>"')\]]*[^\s<>"')\].,;:!?])|\b([A-Z][A-Z0-9_]+-\d{1,7})\b/g;
+      const j = jiraInfo(); let last = 0, m;
+      const wrap = (tag, text) => { const e = document.createElement(tag); e.textContent = text; parent.append(e); };
+      while ((m = re.exec(seg))) {
+        if (m.index > last) parent.append(seg.slice(last, m.index));
+        if (m[1] !== undefined) wrap('code', m[1]);
+        else if (m[2] !== undefined) wrap('strong', m[2]);
+        else if (m[3] !== undefined) wrap('del', m[3]);
+        else if (m[4] !== undefined) wrap('em', m[4]);
+        else if (m[5]) {
+          const ref = refFromUrl(m[5]);
+          if (ref) parent.append(refChip(ref.kind, ref.label, m[5]));
+          else { const a = document.createElement('a'); a.href = m[5]; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = m[5]; parent.append(a); }
+        } else if (j.base && j.keys.includes(m[6].replace(/-\d+$/, ''))) parent.append(refChip('jira', m[6], j.base + '/browse/' + m[6]));
+        else parent.append(m[6]);
+        last = re.lastIndex;
+      }
+      if (last < seg.length) parent.append(seg.slice(last));
+    }
+    // Your own message: lists (- * + and 1.), # headings, > quotes, `code`, **bold**, *italic*, ~~strike~~, ``` blocks,
+    // links and ticket keys are shown formatted. Everything is built as DOM nodes from the text, so nothing you
+    // type can inject markup; plain lines keep their line breaks.
+    function renderUserText(text, bubble) {
+      bubble.textContent = '';
+      String(text).split(/(```[\s\S]*?```)/g).forEach((seg, i) => {
+        if (i % 2) {
+          const m = seg.match(/^```[^\n]*\n?([\s\S]*?)\n?```$/);
+          const pre = document.createElement('pre'), code = document.createElement('code');
+          pre.className = 'ub-pre'; code.textContent = m ? m[1] : seg; pre.append(code); bubble.append(pre);
+          return;
+        }
+        let buf = [], stack = [];
+        const flush = () => { const t = buf.join('\n'); buf = []; if (t.trim()) inlineMd(t.replace(/^\n+|\n+$/g, ''), bubble); };
+        seg.split('\n').forEach(line => {
+          let m;
+          if ((m = line.match(/^([ \t]*)([-*+]|\d+[.)])[ \t]+(.*)$/))) {
+            flush();
+            const indent = m[1].replace(/\t/g, '  ').length, ordered = /\d/.test(m[2]);
+            while (stack.length && indent < stack[stack.length - 1].indent) stack.pop();
+            if (stack.length && indent === stack[stack.length - 1].indent && stack[stack.length - 1].el.tagName !== (ordered ? 'OL' : 'UL')) stack.pop();
+            if (!stack.length || indent > stack[stack.length - 1].indent) {
+              const el = document.createElement(ordered ? 'ol' : 'ul'); el.className = 'ub-list';
+              if (ordered && parseInt(m[2]) > 1) el.start = parseInt(m[2]);
+              (stack.length ? stack[stack.length - 1].el.lastElementChild : bubble).append(el);
+              stack.push({indent, el});
+            }
+            const li = document.createElement('li'); inlineMd(m[3], li); stack[stack.length - 1].el.append(li);
+          } else if ((m = line.match(/^(#{1,6})[ \t]+(.+)$/))) {
+            flush(); stack = [];
+            const h = document.createElement('div'); h.className = 'ub-h'; inlineMd(m[2], h); bubble.append(h);
+          } else if ((m = line.match(/^>[ \t]?(.*)$/))) {
+            flush(); stack = [];
+            const q = document.createElement('div'); q.className = 'ub-q'; inlineMd(m[1], q); bubble.append(q);
+          } else { if (line.trim() || buf.length) stack = []; buf.push(line); }
+        });
+        flush();
+      });
+      linkFileRefs(bubble);
+    }
+    // The message box shows the same formatting while you type: a copy of the text sits behind the (transparent)
+    // text box and colours the pieces. Only colours change, never widths, so both always wrap the same way.
+    function mirrorUpdate() {
+      const mir = $('inMirror'); if (!mir) return;
+      const text = $('input').value, j = jiraInfo();
+      const re = /(```[\s\S]*?(?:```|(?![\s\S])))|(`[^`\n]+`?)|(\*\*[^*\n]+\*\*)|(~~[^~\n]+~~)|((?<![*\w])\*[^*\s][^*\n]*?\*(?![*\w]))|(https?:\/\/[^\s<>"')\]]*[^\s<>"')\].,;:!?])|(\b[A-Z][A-Z0-9_]+-\d{1,7}\b)|(^[ \t]*(?:[-*+]|\d+[.)])[ \t]+)|(^#{1,6}[ \t].*$)|(^>[ \t]?)|((?:[A-Za-z]:[\\/]|\.{1,2}[\\/]|~[\\/])[^\s"'`<>|*?]*[^\s"'`<>|*?.,;:!)]|\b[\w.-]+(?:[\\/][\w.-]+)+(?:\.\w{1,8})?\b|\b[\w-]+\.(?:csv|tsv|json|ya?ml|xml|md|txt|log|js|ts|tsx|jsx|py|java|kt|go|rs|c|h|cpp|cs|sql|sh|ps1|bat|html?|css|robot|resource|properties|gradle|toml|ini|env|pdf|docx?|xlsx?|pptx?|zip|png|jpe?g|gif|svg|webp|ico)\b)/gm;
+      let out = '', last = 0, m;
+      while ((m = re.exec(text))) {
+        out += esc(text.slice(last, m.index));
+        const t = esc(m[0]);
+        if (m[1] || m[2]) out += `<span class="mi-code">${t}</span>`;
+        else if (m[3]) out += `<span class="mi-b">${t}</span>`;
+        else if (m[4]) out += `<span class="mi-s">${t}</span>`;
+        else if (m[5]) out += `<span class="mi-i">${t}</span>`;
+        else if (m[6]) out += `<span class="${refFromUrl(m[0]) ? 'mi-ref' : 'mi-url'}">${t}</span>`;
+        else if (m[7]) out += j.base && j.keys.includes(m[0].replace(/-\d+$/, '')) ? `<span class="mi-ref">${t}</span>` : t;
+        else if (m[8]) out += `<span class="mi-mark">${t}</span>`;
+        else if (m[9]) out += `<span class="mi-h">${t}</span>`;
+        else if (m[10]) out += `<span class="mi-q">${t}</span>`;
+        else out += `<span class="mi-file">${t}</span>`;
+        last = re.lastIndex;
+        if (m[0] === '') re.lastIndex++;
+      }
+      mir.innerHTML = out + esc(text.slice(last)) + '​';
+      mir.scrollTop = $('input').scrollTop;
+    }
+
+    // A short "Label:" line that comes right after a list item (no blank line) is read by Markdown as part of that
+    // item: "Not done:" ended up inside the bullet above it, unformatted. When such a line is followed by a list, a
+    // blank line goes before it, so it is a paragraph of its own and gets the label style (see markLabels).
+    function separateLabels(text) {
+      const item = /^\s*(?:[*+-]|\d+[.)])\s+\S/;
+      const label = /^(?:\*\*|__)?\p{L}[^\n`]{0,38}?:(?:\*\*|__)?\s*$/u;
+      const lines = String(text).split('\n'), out = [];
+      let fence = null;
+      lines.forEach((ln, i) => {
+        const f = ln.match(/^\s*(```|~~~)/);
+        if (f) { fence = !fence ? f[1] : (f[1] === fence ? null : fence); out.push(ln); return; }
+        const prev = out[out.length - 1];
+        if (!fence && prev && prev.trim() && label.test(ln) && item.test(lines[i + 1] || '') && (item.test(prev) || /^\s{2,}\S/.test(prev))) out.push('');
+        out.push(ln);
+      });
+      return out.join('\n');
+    }
     function renderMarkdown(text) {
-      const {text: prepared, math} = extractMath(text);
+      const {text: prepared, math} = extractMath(separateLabels(text));
       const html = DOMPurify.sanitize(marked.parse(prepared));
       return restoreMath(html, math);
     }
@@ -6157,9 +9340,11 @@
     let busy = false, runId = null, controller = null;
 
     // ---------- theme ----------
-    // Code themes from highlight.js (cdnjs). "Auto" follows the interface theme.
+    // Code themes from highlight.js (cdnjs). The default ('') is Atom One, following the interface theme: Atom One Dark
+    // in dark mode, Atom One Light in light mode. 'auto' is the app's own palette (accent colour, no extra stylesheet).
     const CODE_THEMES = [
-      ['Auto (match theme)', ''],
+      ['Atom One (match theme)', ''],
+      ['App colors (accent)', 'auto'],
       ['GitHub Dark', 'github-dark'],
       ['GitHub Light', 'github'],
       ['Atom One Dark', 'atom-one-dark'],
@@ -6176,10 +9361,16 @@
       ['Gruvbox Dark', 'base16/gruvbox-dark-hard'],
     ];
     function applyCodeTheme() {
-      const choice = store.get('gui.codeTheme', '');
-      const dark = document.documentElement.dataset.theme !== 'light';
-      const name = choice || (dark ? 'github-dark' : 'github');
-      $('hlTheme').href = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/${name}.min.css`;
+      const stored = store.get('gui.codeTheme', '');
+      const light = document.documentElement.dataset.theme === 'light';
+      const choice = stored === 'auto' ? '' : stored || (light ? 'atom-one-light' : 'atom-one-dark');
+      if (choice) {
+        document.body.classList.remove('hl-auto');
+        $('hlTheme').href = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/${choice}.min.css`;
+      } else {
+        document.body.classList.add('hl-auto');
+        $('hlTheme').removeAttribute('href');
+      }
     }
     function applyTheme(t) {
       document.documentElement.dataset.theme = t;
@@ -6193,7 +9384,7 @@
     // ---------- fonts ----------
     // [name, css font-family, optional Google Fonts spec loaded on demand]
     const UI_FONTS = [
-      ['Inter', 'Inter, system-ui, sans-serif', 'Inter:wght@400;500;600;700'],
+      ['Inter', 'Inter, system-ui, sans-serif', 'Inter:wght@100..700'],
       ['System default', 'system-ui, "Segoe UI", sans-serif'],
       ['Segoe UI', '"Segoe UI", system-ui, sans-serif'],
       ['Roboto', 'Roboto, system-ui, sans-serif', 'Roboto:wght@400;500;700'],
@@ -6366,7 +9557,7 @@
     // Two colours drive the whole palette (see --grad-a / --grad-b). Colours picked earlier with the (removed)
     // temporary picker are still in this browser's storage and keep applying; otherwise the default periwinkle
     // (the second colour is the first darkened 15%, as the Settings picker does).
-    const GRAD_DEFAULT = ['#adb0ff', '#9396d9'];
+    const GRAD_DEFAULT = ['#518af6', '#4575d1'];
     const gradColors = () => [store.get('gui.gradA', GRAD_DEFAULT[0]), store.get('gui.gradB', GRAD_DEFAULT[1])];
     function mixHex(a, b, f) {
       const c = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
@@ -6386,38 +9577,82 @@
     };
     document.addEventListener('click', (e) => {
       if (!$('settings').classList.contains('open')) return;
-      if (!e.target.closest('#settings') && !e.target.closest('#settingsBtn') && !e.target.closest('.selmenu')) closeSettings();
+      if (!e.target.closest('.set-dialog') && !e.target.closest('#settingsBtn') && !e.target.closest('.selmenu')) closeSettings();
     });
+    // the dialog's pages (General, Appearance) and its close button
+    document.querySelectorAll('.set-nav [data-sec]').forEach(b => b.onclick = () => {
+      document.querySelectorAll('.set-nav [data-sec]').forEach(x => x.classList.toggle('on', x === b));
+      document.querySelectorAll('.set-sec').forEach(sec => { sec.hidden = sec.dataset.sec !== b.dataset.sec; });
+    });
+    $('settingsClose').onclick = () => closeSettings();
 
     // ---------- settings ----------
     $('cwd').value = store.get('gui.cwd', '');
     $('approval').value = store.get('gui.approval', 'yolo');
     $('model').value = store.get('gui.model', '');
     if (!$('cwd').value) fetch('/api/info').then(r => r.json()).then(i => {$('cwd').value = i.cwd; saveSettings();});
-    ['cwd', 'approval', 'model'].forEach(id => $(id).addEventListener('change', saveSettings));
+    ['cwd', 'approval', 'model'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); if (id === 'cwd') fetchAppInfo(); }));
     // mode pill icons: Auto-approve = check circle, Auto-edit = pencil, Plan = clipboard list
     const MODE_ICONS = {
       yolo: '<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>',
       auto_edit: '<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/>',
       plan: '<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z"/>',
     };
+    function updateBranch(branch) {
+      const pill = $('branchPill');
+      const label = $('branchLabel');
+      if (!pill || !label) return;
+      if (branch) {
+        label.textContent = branch;
+        pill.hidden = false;
+        pill.title = 'Git branch: ' + branch + ' — click to copy';
+      } else {
+        pill.hidden = true;
+      }
+    }
+    async function fetchBranch() {
+      const cwd = $('cwd').value.trim();
+      if (!cwd) { updateBranch(''); return; }
+      try {
+        const r = await fetch('/api/branch?cwd=' + encodeURIComponent(cwd));
+        if (r.ok) {
+          const d = await r.json();
+          if (cwd === $('cwd').value.trim()) updateBranch(d.branch || '');
+        }
+      } catch {}
+    }
     function syncPills() {
       const c = $('cwd').value.trim();
+      fetchBranch();
       $('cwdLabel').textContent = c ? (c.split(/[\\/]/).filter(Boolean).pop() || c) : 'Choose folder';
       $('browse').title = c ? 'Working directory: ' + c : 'Choose working directory';
-      $('browse').classList.toggle('locked', $('cwd').disabled);
+      $('browse').hidden = $('cwd').disabled;
+      updateHeader();
       $('approvalLabel').textContent = $('approval').selectedOptions[0]?.text || '';
       const planning = $('approval').value === 'plan';
       $('approvalIcon').innerHTML = MODE_ICONS[$('approval').value] || MODE_ICONS.yolo;
       $('approvalPill').classList.toggle('plan', planning);
-      $('approvalPill').title = planning
-        ? 'Plan mode: Gemini only reads and writes a plan; you approve it before anything changes. Shift+Tab to switch.'
-        : 'Approval mode (Shift+Tab to switch)';
-      if (!pendingSessionFile && !nextPrompt) $('input').placeholder = planning ? 'Describe the task; Gemini plans it first, you approve' : 'Message Gemini';
+      $('approvalPill').dataset.tip = planning                  // the pill tooltip (see .c-bar [data-tip])
+        ? 'Plan mode: you approve the plan before anything changes  ·  Shift+Tab'
+        : 'Approval mode  ·  Shift+Tab';
+      if (!pendingSessionFile && !nextPrompt) $('input').placeholder = planning ? 'Describe the task; Gemini plans it first, you approve' : 'Ask anything, / for actions';
       // A saved model that is no longer in the list (e.g. the old invalid "gemini-3.5-pro") falls back to Auto.
       if ($('model').selectedIndex < 0) {$('model').value = ''; store.set('gui.model', '');}
       $('modelLabel').textContent = ($('model').selectedOptions[0]?.text || 'Auto').replace(' (CLI default)', '');
+      $('browse').classList.toggle('need', !$('cwd').value.trim());   // no folder yet: the pill asks for one
     }
+    function updateHeader() {
+      const elCwd = $('headerCwdLabel');
+      const elTitle = $('headerTitleLabel');
+      if (elCwd) {
+        const c = $('cwd').value.trim();
+        elCwd.textContent = c ? (c.split(/[\\/]/).filter(Boolean).pop() || c) : 'No folder';
+      }
+      if (elTitle) {
+        elTitle.textContent = current && current.title ? current.title : 'New Chat';
+      }
+    }
+    
     function saveSettings() {
       syncPills();
       loadChanges();
@@ -6472,12 +9707,52 @@
       if (e.key === 'Escape') { e.stopPropagation(); if ($('search').value) { $('search').value = ''; onSearchInput(); } else $('search').blur(); }
       if (e.key === 'Enter') { const first = document.querySelector('#sessions .sess'); if (first) first.click(); }
     });
+    // The search button (top left, beside the sidebar button) and Ctrl+K open a box over the chat: type to narrow the
+    // chats down by name, ↑ ↓ to move, Enter or a click to open one, Esc to close. (The old search field in the
+    // sidebar is hidden; the code above it is kept as it was.)
+    const pal = $('palette'), palInput = $('palInput'), palList = $('palList');
+    let palIdx = 0, palItems = [];
+    const agoLong = (t) => {
+      const d = (Date.now() - t) / 86400000;
+      if (d < 1) return ago(t);
+      return d < 30 ? Math.floor(d) + 'd' : d < 365 ? Math.floor(d / 30) + 'mo' : Math.floor(d / 365) + 'y';
+    };
+    const PAL_CHAT = '<svg class="pi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>';
+    function palRender() {
+      const q = palInput.value.trim().toLowerCase();
+      palItems = sessions.filter(s => !q || s.title.toLowerCase().includes(q)).sort((a, b) => b.updated - a.updated).slice(0, 80);
+      palIdx = Math.min(palIdx, Math.max(0, palItems.length - 1));
+      palList.innerHTML = palItems.length ? '' : `<div class="pal-empty">${q ? 'No chats match "' + esc(palInput.value.trim()) + '"' : 'No chats yet'}</div>`;
+      palItems.forEach((s, i) => {
+        const row = document.createElement('div');
+        row.className = 'pal-row' + (i === palIdx ? ' hi' : '');
+        const folder = baseName(s.cwd || '');
+        row.innerHTML = PAL_CHAT + `<span class="pt">${q ? highlightText(s.title, q) : titleHtml(s.title)}</span>`
+          + (folder ? `<span class="pf">${ICON_FOLDER}${esc(folder)}</span>` : '<span class="pf"></span>') + `<span class="pw">${agoLong(s.updated)}</span>`;
+        row.onmouseenter = () => palHi(i);
+        row.onclick = () => palOpen(i);
+        palList.appendChild(row);
+      });
+    }
+    function palHi(i, scroll) {
+      palIdx = i;
+      [...palList.children].forEach((r, k) => r.classList.toggle('hi', k === i));
+      if (scroll) palList.children[i]?.scrollIntoView({block: 'nearest'});
+    }
+    function palOpen(i) { const s = palItems[i]; if (!s) return; closePalette(); if (!busy) openSession(s); }
+    function openPalette() { pal.hidden = false; palInput.value = ''; palIdx = 0; palRender(); palInput.focus(); }
+    function closePalette() { pal.hidden = true; }
+    $('searchBtn').onclick = openPalette;
+    pal.addEventListener('mousedown', (e) => { if (!e.target.closest('.pal-box')) closePalette(); });
+    palInput.addEventListener('input', () => { palIdx = 0; palRender(); });
+    palInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); closePalette(); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); palHi(Math.min(palItems.length - 1, palIdx + 1), true); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); palHi(Math.max(0, palIdx - 1), true); }
+      else if (e.key === 'Enter') { e.preventDefault(); palOpen(palIdx); }
+    });
     document.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        if (document.body.classList.contains('collapsed')) setCollapsed(false);
-        $('search').focus(); $('search').select();
-      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); pal.hidden ? openPalette() : closePalette(); }
     });
 
     async function loadSessions() {
@@ -6527,6 +9802,7 @@
 
         const g = document.createElement('div'); g.className = 'group' + (isOpen ? ' open' : '');
         g.innerHTML = `<div class="g-head" title="${esc(cwd)}">
+            <svg class="g-ic"><use href="#i-folder"/></svg>
             <span class="g-name">${esc(folder)}</span>
             <span class="g-count">${items.length}</span>
             <button class="g-add" title="New chat in ${esc(folder)}">+</button>
@@ -6662,7 +9938,7 @@
         const next = input.value.replace(/\s+/g, ' ').trim();
         if (!save || next === s.title) return renderSessions();
         const old = s.title;
-        if (next) { s.title = next; renderSessions(); }            // show it right away
+        if (next) { s.title = next; renderSessions(); if (current && current.id === s.id) { current.title = next; updateHeader(); } }            // show it right away
         let ok = false, msg = '';
         try {
           const res = await fetch('/api/rename', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: s.id, title: next})});
@@ -6730,12 +10006,13 @@
     function newChat() {
       if (busy) return;
       setNextPrompt(null);
-      pendingSessionFile = null; renderImportChip(); $('input').placeholder = 'Message Gemini';
+      pendingSessionFile = null; renderImportChip(); $('input').placeholder = 'Ask anything, / for actions';
       setUrlSession(null);
       setContext(0);
       resetChangesPanel();
       current = null; renderEmpty(); renderSessions(); updateHint(); restoreDraft();
-      $('cwd').disabled = false; syncPills(); $('input').focus(); closeSide();
+      $('cwd').value = ''; saveSettings();          // no default folder: you pick one (the pill above the message box)
+      $('cwd').disabled = false; syncPills(); updateHeader(); $('input').focus(); closeSide();
     }
     function setUrlSession(id) {
       const u = new URL(location.href);
@@ -6746,6 +10023,7 @@
     async function openSession(s) {
       setNextPrompt(null);
       current = {id: s.id, title: s.title, cwd: s.cwd};
+      updateHeader();
       setUrlSession(s.id);
       restoreDraft();
       loadContext(s.id);
@@ -6787,26 +10065,68 @@
         setupTurn(t.userEl, entries, t.active, t.latest);
         lastView = entries[t.active].view; lastMsg = entries[t.active].msg;
       };
-      data.messages.forEach(m => {
-        if (m.role === 'user') {
-          if (pendingTurn) flushTurn(null);
-          const userEl = addUser(m.text); lastView = null;
-          if (m.versions?.length > 1) pendingTurn = {userEl, versions: m.versions, active: m.active, latest: m.latest};
-        }
-        else if (pendingTurn) flushTurn(m);
-        else { lastView = showReply(m); lastMsg = m; }
-      });
-      if (pendingTurn) flushTurn(null);
+      const renderTurns = (list) => {
+        list.flat().forEach(m => {
+          if (m.role === 'user') {
+            if (pendingTurn) flushTurn(null);
+            const userEl = addUser(m.text); lastView = null;
+            if (m.versions?.length > 1) pendingTurn = {userEl, versions: m.versions, active: m.active, latest: m.latest};
+          }
+          else if (pendingTurn) flushTurn(m);
+          else { lastView = showReply(m); lastMsg = m; }
+        });
+        if (pendingTurn) flushTurn(null);
+      };
+      // A long chat is built in batches: the last CHAT_PAGE turns now, earlier ones as you scroll up.
+      const turns = [];
+      data.messages.forEach(m => { if (m.role === 'user' || !turns.length) turns.push([]); turns[turns.length - 1].push(m); });
+      const first = Math.max(0, turns.length - CHAT_PAGE);
+      renderTurns(turns.slice(first));
+      const endView = lastView, endMsg = lastMsg;
+      const older = () => { if (first > 0) showOlderTurns(s.id, turns, first, renderTurns); };
       if (live) {
         // Gemini is still answering this chat (the page was reloaded or reopened): show its message and pick
         // the reply back up, with everything it already wrote, thought and ran
         addUser(live.prompt);
         $('chat').scrollTop = $('chat').scrollHeight;
+        older();
         send(null, live);
         return;
       }
-      if (lastView) addQuickReplies(lastView, lastMsg);
+      if (endView) addQuickReplies(endView, endMsg);
       $('chat').scrollTop = $('chat').scrollHeight;
+      older();
+    }
+
+    // ---------- long chats: earlier turns on demand ----------
+    // Building every message of a long chat at once (markdown, code highlighting, tables) slows the page down, so
+    // a chat opens with its last CHAT_PAGE turns; a marker sits above them and, when you scroll near it, the
+    // previous batch is built above (keeping your scroll position), until the start of the chat.
+    function showOlderTurns(id, turns, start, renderTurns) {
+      olderObserver?.disconnect();
+      const chat = $('chat');
+      const mark = document.createElement('div');
+      mark.className = 'older-turns';
+      mark.innerHTML = '<span class="dl-spin"></span>Loading earlier messages…';
+      $('log').prepend(mark);
+      const loadMore = () => {
+        if (current?.id !== id || !mark.isConnected) { olderObserver?.disconnect(); return; }
+        const from = Math.max(0, start - CHAT_PAGE);
+        const fromBottom = chat.scrollHeight - chat.scrollTop;
+        const box = document.createElement('div');
+        mark.after(box);
+        logTarget = box;
+        try { renderTurns(turns.slice(from, start)); } finally { logTarget = null; }
+        box.querySelectorAll(OLD_TURN_ACTIONS).forEach(a => a.remove());   // only the newest turn keeps these
+        box.replaceWith(...box.childNodes);
+        start = from;
+        chat.scrollTop = chat.scrollHeight - fromBottom;                   // what you were reading stays put
+        if (!start) { olderObserver.disconnect(); mark.remove(); return; }
+        olderObserver.unobserve(mark); olderObserver.observe(mark);         // still close to the top? next batch
+      };
+      olderObserver = new IntersectionObserver((es) => { if (es.some(e => e.isIntersecting)) loadMore(); },
+        {root: chat, rootMargin: '800px 0px 0px 0px'});
+      olderObserver.observe(mark);
     }
     // the run still going on the server for this chat, if any
     async function liveRun(id) {
@@ -6815,6 +10135,60 @@
         const list = await (await fetch('/api/runs')).json();
         return (Array.isArray(list) && list.filter(r => r.sessionId === id && !r.done).pop()) || null;
       } catch { return null; }
+    }
+
+    // ---------- message dots ----------
+    // A column of dots at the chat's left edge, one per message you sent (of the turns built so far). The one
+    // you are reading is lit; hovering a dot shows that message and the start of Gemini's answer; a click
+    // scrolls to it.
+    const turnNav = document.createElement('div'); turnNav.className = 'turn-nav'; turnNav.hidden = true;
+    const turnTip = document.createElement('div'); turnTip.className = 'turn-tip'; turnTip.hidden = true;
+    document.querySelector('main').append(turnNav, turnTip);
+    let turnDots = [];
+    function buildTurnNav() {
+      const users = [...$('log').querySelectorAll(':scope > .msg.user')];
+      turnNav.innerHTML = ''; turnDots = []; turnTip.hidden = true;
+      turnNav.hidden = users.length < 2;
+      if (turnNav.hidden) return;
+      turnNav.style.setProperty('--pitch', Math.max(4, Math.min(10, Math.floor($('chat').clientHeight * .6 / users.length))) + 'px');
+      users.forEach((u, i) => {
+        const d = document.createElement('button'); d.type = 'button'; d.className = 'tn-dot';
+        d.setAttribute('aria-label', `Go to message ${i + 1} of ${users.length}`);
+        d.onclick = () => {
+          const chat = $('chat');
+          chat.scrollTo({top: chat.scrollTop + u.getBoundingClientRect().top - chat.getBoundingClientRect().top - 20, behavior: 'smooth'});
+        };
+        d.onmouseenter = () => showTurnTip(d, u, i, users.length);
+        d.onmouseleave = () => { turnTip.hidden = true; };
+        turnNav.appendChild(d); turnDots.push({d, u});
+      });
+      markTurnNav();
+    }
+    function markTurnNav() {
+      if (turnNav.hidden) return;
+      const line = $('chat').getBoundingClientRect().top + $('chat').clientHeight / 3;
+      let on = 0;
+      turnDots.forEach(({u}, i) => { if (u.getBoundingClientRect().top <= line) on = i; });
+      turnDots.forEach(({d}, i) => d.classList.toggle('on', i === on));
+    }
+    function showTurnTip(dot, u, i, n) {
+      let ai = u.nextElementSibling;
+      while (ai && (ai.hidden || !ai.classList.contains('msg'))) ai = ai.nextElementSibling;
+      if (ai && !ai.classList.contains('ai')) ai = null;
+      const q = u.querySelector('.bubble')?.textContent.trim() || '';
+      const a = ai ? [...ai.querySelectorAll('.md')].map(m => m.textContent).join(' ').replace(/\s+/g, ' ').trim() : '';
+      turnTip.innerHTML = `<div class="tt-q">${esc(q)}</div>` + (a ? `<div class="tt-a">${esc(a.slice(0, 320))}</div>` : '')
+        + `<div class="tt-n">${i + 1} of ${n}</div>`;
+      turnTip.hidden = false;
+      const r = dot.getBoundingClientRect(), m = document.querySelector('main').getBoundingClientRect();
+      turnTip.style.left = Math.round(r.right - m.left + 8) + 'px';
+      turnTip.style.top = Math.round(Math.max(8, Math.min(r.top - m.top - 24, m.height - turnTip.offsetHeight - 8))) + 'px';
+    }
+    {
+      let t = 0, raf = 0;
+      new MutationObserver(() => { clearTimeout(t); t = setTimeout(buildTurnNav, 150); }).observe($('log'), {childList: true});
+      $('chat').addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; markTurnNav(); }); }, {passive: true});
+      addEventListener('resize', () => { clearTimeout(t); t = setTimeout(buildTurnNav, 150); });
     }
 
     // ---------- empty state ----------
@@ -6946,7 +10320,32 @@
         : state === 'failed' ? '' : '<span class="dl-spin"></span>') + `<span>${TEXT[state]}</span>`;
       if (state === 'received') d._t = setTimeout(() => { d.classList.add('gone'); d._t = setTimeout(() => d.remove(), 400); }, 2500);
     }
+    // Gemini CLI hooks (e.g. a BeforeAgent hook) put <hook_context>…</hook_context> into the saved prompt. That is
+    // not what you typed, so it is taken out of the message and shown as a small "Hook context" tag instead.
+    function splitHookContext(text) {
+      const hooks = [];
+      const rest = String(text || '').replace(/<hook_context>([\s\S]*?)<\/hook_context>\s*/g, (_, h) => {
+        const t = document.createElement('textarea'); t.innerHTML = h;   // decode &lt; &gt; &amp; (nothing runs)
+        hooks.push(t.value.trim()); return '';
+      });
+      return hooks.length ? {text: rest.trim(), hooks} : {text, hooks};
+    }
+    const HOOK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>';
+    function hookTag(hooks) {
+      const wrap = document.createElement('div'); wrap.className = 'hook-wrap';
+      const tag = document.createElement('button'); tag.type = 'button'; tag.className = 'hook-tag';
+      tag.title = 'Context added to this message by a Gemini hook. Click to show it.';
+      tag.innerHTML = `<span class="ic">${HOOK_ICON}</span><span class="nm">Hook context</span>`
+        + (hooks.length > 1 ? `<span class="ex">${hooks.length}</span>` : '')
+        + '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+      const body = document.createElement('div'); body.className = 'hook-body'; body.hidden = true;
+      body.textContent = hooks.join('\n\n');
+      tag.onclick = () => { body.hidden = !body.hidden; tag.classList.toggle('open', !body.hidden); };
+      wrap.append(tag, body);
+      return wrap;
+    }
     function addUser(text, files) {
+      const hk = splitHookContext(text); text = hk.text;
       if (!files) { const split = splitAttachments(text); files = split.files; text = split.text; }
       $('log').querySelector('.empty')?.remove();
       const el = document.createElement('div'); el.className = 'msg user';
@@ -6961,9 +10360,10 @@
           </button>
         </div>`;
       const bubble = el.querySelector('.bubble');
-      bubble.textContent = text;
+      renderUserText(text, bubble);
       if (!text) bubble.hidden = true;           // attachment-only message
       if (files && files.length) el.insertBefore(messageAttachments(files), bubble);
+      if (hk.hooks.length) el.insertBefore(hookTag(hk.hooks), el.firstChild);
       el.querySelector('[data-a=copy]').onclick = (e) => {
         navigator.clipboard.writeText(text);
         const btn = e.currentTarget;
@@ -6974,8 +10374,9 @@
       el.querySelector('[data-a=retry]').onclick = () => retryTurn(el, text, files || []);
       el.querySelector('[data-a=edit]').onclick = () => { $('input').value = text; autosize(); $('input').focus(); };
       // Retry/Edit only make sense on the newest message, so drop them from previous messages, keeping Copy on all.
-      $('log').querySelectorAll('.u-actions [data-a=retry], .u-actions [data-a=edit], .quick, .plan-card .pc-actions, .plan-card .pc-feedback').forEach(a => a.remove());
-      $('log').appendChild(el);
+      // (Earlier turns added while scrolling up go above the newest one, which keeps its buttons: see showOlderTurns.)
+      if (!logTarget) $('log').querySelectorAll(OLD_TURN_ACTIONS).forEach(a => a.remove());
+      logAppend(el);
       clampIfLong(bubble);
       return el;
     }
@@ -7005,6 +10406,15 @@
     // ---------- tables ----------
     // A long or wide table scrolls in place (header stays visible) and gets a button to open it in full.
     const ICON_EXPAND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>';
+    // A short line ending with ":" right before a list ("Done:", "Next action:") labels that list: it is shown
+    // bold and sits close to the list, like a small heading.
+    function markLabels(root) {
+      root.querySelectorAll('p').forEach(p => {
+        const t = p.textContent.trim(), next = p.nextElementSibling;
+        if (t.length <= 40 && t.endsWith(':') && !t.includes('\n') && /^(UL|OL)$/.test(next?.tagName || '')
+          && !p.querySelector('code, a, img')) p.classList.add('md-label');
+      });
+    }
     function enhanceTables(root) {
       root.querySelectorAll('table').forEach(t => {
         if (t.closest('.tbl')) return;
@@ -7306,7 +10716,7 @@
     }
     class AssistantView {
       constructor(m) {
-        this.m = m; this.nodes = new Map(); this.edits = new Map();   // edits: tool part -> its inline diff card
+        this.m = m; this.nodes = new Map(); this.edits = new Map(); this.quietEdits = new Map();   // edits: tool part -> its inline diff card
         this.el = document.createElement('div'); this.el.className = 'msg ai';
         this.el.innerHTML = `<div class="body"></div>
           <div class="actions">
@@ -7327,7 +10737,7 @@
           btn.title = 'Copied';
           setTimeout(() => { btn.innerHTML = orig; btn.title = 'Copy reply'; btn.blur(); }, 1500);
         };
-        $('log').appendChild(this.el);
+        logAppend(this.el);
         this.start = Date.now();
       }
       render() {
@@ -7353,7 +10763,8 @@
                 const head = document.createElement('button');
                 head.className = 'tools-head';
                 head.innerHTML = '<span class="caret"></span><span class="sum"></span>';
-                head.onclick = () => { group.classList.toggle('open'); group.dataset.touched = '1'; };
+                const own = group;          // this header opens its own group (the shared `group` moves on to the next one)
+                head.onclick = () => { own.classList.toggle('open'); own.dataset.touched = '1'; };
                 group.appendChild(head);
                 this.insert(group);
               }
@@ -7361,22 +10772,27 @@
               node = p.kind === 'tool' ? toolCard(p) : thoughtLine(p);
               group.appendChild(node); this.nodes.set(p, node);
               const edit = p.kind === 'tool' && editCard(p);
-              if (edit) { this.insert(edit); this.edits.set(p, edit); }
+              if (edit && edit.classList.contains('quiet')) {
+                // memory / scratch / backup notes stay in the steps (hidden while they are folded) and keep their diff
+                node.classList.add('has-edit'); group.appendChild(edit); this.quietEdits.set(p, edit);
+              } else if (edit) { this.insert(edit); this.edits.set(p, edit); }
             }
             if (p.kind === 'tool') updateToolCard(node, p);
-            this.edits.get(p)?.classList.toggle('failed', !!p.status && p.status !== 'success');
+            (this.edits.get(p) || this.quietEdits.get(p))?.classList.toggle('failed', !!p.status && p.status !== 'success');
           } else if (p.kind === 'text') {
             if (!node) {node = document.createElement('div'); node.className = 'md'; this.insert(node); this.nodes.set(p, node);}
             if (node.dataset.len != p.text.length) {
               node.innerHTML = renderMarkdown(p.text);
               highlight(node);
               enhanceTables(node);
+              markLabels(node);
               if (m.pending) {
                 inkFresh(node);
                 const sc = [...node.querySelectorAll('.tbl-scroll')].pop();
                 if (sc && p.text.trimEnd().endsWith('|')) sc.scrollTop = sc.scrollHeight;   // a table is being written
               }
               linkFileRefs(node);
+              linkTickets(node);
               node.dataset.len = p.text.length;
               node.dataset.imgs = '';
             }
@@ -7589,6 +11005,13 @@
       }
       renderThinking() {
         const m = this.m, last = m.parts[m.parts.length - 1];
+        
+        // Find the user message element (it's immediately before this assistant message wrapper)
+        const userMsg = this.el.previousElementSibling;
+        if (userMsg && userMsg.classList.contains('user')) {
+          userMsg.classList.toggle('sending', !!m.pending && m.phase === 'sending');
+        }
+
         const show = m.pending && (!last || last.kind !== 'text');
         if (!show) {if (this.thinkEl) {this.thinkEl.remove(); this.thinkEl = null; clearInterval(this.tick);} return;}
         // "Thinking" while Gemini works on its answer (before its first output and between steps); "Waiting"
@@ -7599,10 +11022,10 @@
         if (m.netRetry && Date.now() - m.netRetry.at < 90000) {
           label = 'Reconnecting to Google';
           sub = `attempt ${m.netRetry.attempt + 1} · ${m.netRetry.reason}`;
-        } else if (m.phase === 'sending') {
-          label = 'Sending your message'; waiting = true;
-        } else if (m.phase === 'starting') {
-          label = 'Starting Gemini'; waiting = true;
+        } else if (m.phase === 'sending' || m.phase === 'starting') {
+          // the request is on its way to the app, which is launching the Gemini CLI: shown with the same shimmer
+          // as "Thinking" (a reopened running chat is reconnecting instead)
+          label = m.attached ? 'Reconnecting to Gemini CLI' : 'Calling Gemini CLI'; waiting = true;
         } else if (toolRunning && /shell|command/i.test(last.name)) {
           label = 'Waiting for the command to finish'; waiting = true;
           sub = last.params?.description || shortArg(last.params);
@@ -7706,28 +11129,9 @@
     }
     $('accessModal').addEventListener('mousedown', (e) => { if (e.target === $('accessModal')) accessOpen?.(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && accessOpen) { e.stopPropagation(); accessOpen(); } }, true);
-    $('accessManage').onclick = (e) => { e.stopPropagation(); manageFolderAccess(); };
-    async function ensureFolderAccess(cwd) {
-      const key = cwd.toLowerCase();
-      if (accessChecked.has(key)) return;
-      let st;
-      try { const r = await fetch('/api/access?cwd=' + encodeURIComponent(cwd)); if (!r.ok) return; st = await r.json(); } catch { return; }
-      accessChecked.add(key);
-      const ask = (st.dirs || []).filter(d => !d.asked);
-      if (ask.length) await accessDialog(cwd, ask, false);
-    }
-    async function manageFolderAccess() {
-      const cwd = $('cwd').value.trim();
-      if (!cwd) return toast('Choose a folder first');
-      let st;
-      try { const r = await fetch('/api/access?cwd=' + encodeURIComponent(cwd)); st = r.ok ? await r.json() : {error: 'Restart Gemini Studio to use this'}; }
-      catch { st = {error: 'Could not reach the server'}; }
-      if (st.error) return toast(st.error);
-      if (!st.dirs.length) return toast('No outside folders to allow (~/.gemini/memory and ~/.gemini/scratch do not exist)');
-      closeSettings();
-      await accessDialog(cwd, st.dirs, true);
-      toast('Applies from the next message');
-    }
+    // (No popup any more: Gemini asks for access to outside folders itself. Settings -> Folder access still lists them.)
+    async function ensureFolderAccess() {}
+    function manageFolderAccess() { toast('Gemini asks for access to outside folders itself'); }
 
     // ---------- "/" commands ----------
     // Typing "/" in the message box opens a menu of commands, filtered as you type (↑ ↓ to move, Tab or Enter to
@@ -7911,7 +11315,7 @@
       // Gemini reads attachments through @"path" references placed before the message.
       const files = attach ? [] : retry ? retry.files : attachments.slice();
       const importing = !attach && !current?.id ? pendingSessionFile : null;
-      if (importing) { pendingSessionFile = null; renderImportChip(); $('input').placeholder = 'Message Gemini'; }
+      if (importing) { pendingSessionFile = null; renderImportChip(); $('input').placeholder = 'Ask anything, / for actions'; }
       const prompt = buildPrompt(files, text);
       let userEl = null;
       if (!retry && !attach) {
@@ -7928,7 +11332,7 @@
       // phase, until Gemini produces something: sending (the request is on its way to the app's server) →
       // starting (the server is launching Gemini) → waiting (Gemini has the message and is waiting on Google)
       setNextPrompt(null);                                 // a new reply starts: the old suggestion goes
-      const msg = {role: 'assistant', parts: [], pending: true, phase: attach ? 'starting' : 'sending', lastEventAt: Date.now()};
+      const msg = {role: 'assistant', parts: [], pending: true, phase: attach ? 'starting' : 'sending', attached: !!attach, lastEventAt: Date.now()};
       const view = new AssistantView(msg);
       if (attach?.startedAt) view.start = attach.startedAt;      // the timer counts from when Gemini really started
       view.render();
@@ -8186,9 +11590,18 @@
       const cwd = $('cwd').value.trim();
       const rel = relPath(fp, cwd), name = baseName(fp), dir = rel.slice(0, Math.max(0, rel.length - name.length)).replace(/[\\/]$/, '');
       // one line ("Edited index.html +15 −2 ›") that opens to the diff; the file name opens the file
+      // notes Gemini keeps for itself: ~/.gemini/scratch (a pencil) and ~/.gemini/memory (memorized); clicking still
+      // opens the changes, like any other edit
+      const gem = (fp.match(/[\\/]\.gemini[\\/](scratch|memory|backups)[\\/]/i) || [])[1]?.toLowerCase() || (/(^|[\\/])RESTORE[^\\/]*\.md$/i.test(fp) ? 'restore' : '');
+      const SVG = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+      const state = gem === 'scratch' ? SVG('<path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="m14 7 3 3"/>') + 'Scratch'
+        : gem === 'memory' ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 0 1-.657.643 48.39 48.39 0 0 1-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 0 1-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 0 0-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 0 1-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 0 0 .657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 0 1-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 0 0 5.427-.63 48.05 48.05 0 0 0 .582-4.717.532.532 0 0 0-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401v0a.656.656 0 0 0 .658-.663 48.422 48.422 0 0 0-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 0 1-.61-.58v0Z"/></svg>` + 'Memorized'
+        : gem === 'backups' || gem === 'restore' ? SVG('<path d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"/>') + 'Restore note'
+        : (p.name === 'write_file' ? 'Wrote' : 'Edited');
+      if (gem) el.classList.add('gem-' + gem, 'quiet');       // Gemini's own notes: inside the steps, not shown as a change
       el.innerHTML = `<button class="ec-head" title="${esc(fp)}">
-          <span class="ec-state">${p.name === 'write_file' ? 'Wrote' : 'Edited'}</span>
-          <span class="nm">${esc(name)}</span>${dir ? `<span class="dir">${esc(dir)}</span>` : ''}
+          <span class="ec-state">${state}</span>
+          <span class="nm">${esc(name)}</span>${dir && !gem ? `<span class="dir">${esc(dir)}</span>` : ''}
           <span class="ch-nums"><span class="plus">+${added}</span><span class="minus">−${removed}</span></span>
           <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
         </button>
@@ -8276,7 +11689,7 @@
         .then(d => {
           if (d.error) { body.innerHTML = `<div class="fmsg">${esc(d.error)}. Gemini still has the plan in this chat, so you can approve it.</div>`; return; }
           body.innerHTML = renderMarkdown(d.text);
-          highlight(body); enhanceTables(body);
+          highlight(body); enhanceTables(body); markLabels(body);
           if (d.path) q('.pc-name').title = d.path;
           requestAnimationFrame(() => { if (body.scrollHeight > body.clientHeight + 8) q('.pc-more').hidden = false; });
         });
@@ -8339,9 +11752,19 @@
       if (!IMG_RE.test(f.name || f.path)) return '';
       return `<img class="thumb" src="${esc(fileUrl(f))}" alt="">`;
     }
+    let lightboxScale = 0.75;
     $('lightbox').onclick = () => $('lightbox').classList.remove('on');
+    $('lightbox').addEventListener('wheel', (e) => {
+      e.preventDefault();
+      lightboxScale *= e.deltaY < 0 ? 1.15 : 0.85;
+      lightboxScale = Math.max(0.1, Math.min(lightboxScale, 15));
+      $('lightbox').querySelector('img').style.transform = `scale(${lightboxScale})`;
+    });
     function showImage(src) {
-      $('lightbox').querySelector('img').src = src;
+      lightboxScale = 0.75;
+      const img = $('lightbox').querySelector('img');
+      img.style.transform = `scale(${lightboxScale})`;
+      img.src = src;
       $('lightbox').classList.add('on');
     }
     const fmtSize = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? Math.round(n / 1024) + ' KB' : n + ' B';
@@ -8453,7 +11876,34 @@
       });
       return [...byName.values()];
     }
-    function renderQuota() {
+    function renderQuota() { renderQuotaPop(); renderUsage(); }
+    // Settings -> Usage: one row per model with its share used today, a bar and the time until it resets
+    function renderUsage() {
+      const box = $('usageBody'); if (!box) return;
+      if (!quotaData) { box.innerHTML = '<p class="set-foot"><span class="shimmer">Loading quota</span></p>'; return; }
+      if (quotaData.error || !quotaData.models?.length) { box.innerHTML = `<p class="set-foot">${esc(quotaData.error || 'No quota information for this account.')}</p>`; return; }
+      const mine = $('model').value;
+      const row = (m) => {
+        const pct = Math.round(m.used * 100);
+        const cls = m.remaining <= 0.1 ? 'low' : m.remaining <= 0.25 ? 'warn' : '';
+        const inUse = mine && (m.model === mine || m.model === mine.replace(/-preview$/, ''));
+        return `<div class="set-row use-row ${cls}">
+            <div class="use-main">
+              <div class="use-top"><span class="use-name" title="${esc(m.model)}">${esc(shortModel(m.model))}${inUse ? '<span class="use-tag">In use</span>' : ''}</span><span class="use-pct">${pct}% used</span></div>
+              <div class="use-bar"><i style="width:${pct ? `max(${pct}%, 6px)` : '0'}"></i></div>
+            </div>
+            <span class="use-reset">${m.resetTime ? 'resets in ' + esc(whenReset(m.resetTime)) : ''}</span>
+          </div>`;
+      };
+      // one card per tier (Pro, Flash, Flash Lite), newest model first
+      const tierOf = (name) => /flash-lite/i.test(name) ? 'Flash Lite' : /flash/i.test(name) ? 'Flash' : /pro/i.test(name) ? 'Pro' : 'Other';
+      const tiers = {};
+      uniqueQuotaModels(quotaData.models).forEach(m => (tiers[tierOf(m.model)] = tiers[tierOf(m.model)] || []).push(m));
+      box.innerHTML = ['Pro', 'Flash', 'Flash Lite', 'Other'].filter(t => tiers[t]).map(t =>
+        `<h3 class="use-tier">${t}</h3><div class="set-card">${tiers[t].sort((a, b) => shortModel(b.model).localeCompare(shortModel(a.model), undefined, {numeric: true})).map(row).join('')}</div>`).join('')
+        + (quotaData.project ? `<p class="set-foot">Project ${esc(quotaData.project)} · requests per day</p>` : '');
+    }
+    function renderQuotaPop() {
       const box = $('quotaBody');
       if (!quotaData) { box.innerHTML = '<div class="qnote"><span class="shimmer">Loading quota</span></div>'; return; }
       if (quotaData.error) { box.innerHTML = `<div class="qnote">${esc(quotaData.error)}</div>`; return; }
@@ -8498,12 +11948,14 @@
       }
       renderQuota();
     }
+    // the ring opens Settings on the Usage page (no popover any more)
     $('quotaPill').onclick = (e) => {
       e.stopPropagation();
-      const pop = $('quotaPop');
-      pop.classList.toggle('open');
-      if (pop.classList.contains('open')) { renderQuota(); loadQuota(); }
+      openSettings();
+      document.querySelector('.set-nav [data-sec=usage]').click();
+      renderUsage(); loadQuota();
     };
+    $('usageRefresh').onclick = () => { quotaData = null; renderQuota(); loadQuota(true); loadModels(true); };
     $('quotaRefresh').onclick = (e) => { e.stopPropagation(); quotaData = null; renderQuota(); loadQuota(true); loadModels(true); };
     document.addEventListener('click', (e) => {
       if ($('quotaPop').classList.contains('open') && !e.target.closest('#quotaPop') && !e.target.closest('#quotaPill')) {
@@ -8572,8 +12024,16 @@ Context ${pct}% of the model's window`;
       panelFiles = null; panelCwd = null; changedFiles = []; notARepo = false; renderedKey = null;
       $('changesPill').hidden = true;
       $('diffBody').innerHTML = ''; diffCache.clear();
-      if ($('diffPanel').classList.contains('open')) $('diffPanel').classList.remove('open');
-      setTimeout(loadChanges, 0); // after the new folder is in place
+      
+      setTimeout(() => {
+        loadChanges();
+        if (store.get('gui.diffOpen', false)) {
+          if (store.get('gui.panelTab', 'changes') === 'files') openFiles();
+          else openChanges();
+        } else {
+          $('diffPanel').classList.remove('open');
+        }
+      }, 0); // after the new folder is in place
     }
     let lastChangeCheck = 0;
     async function loadChanges(quiet) {
@@ -8590,6 +12050,7 @@ Context ${pct}% of the model's window`;
         const d = await (await fetch('/api/changes?cwd=' + encodeURIComponent(cwd))).json();
         changedFiles = d.files || [];
         repo = d.repo !== false;
+        if (cwd === $('cwd').value.trim()) updateBranch(repo ? (d.branch || '') : '');
       } catch { changedFiles = []; }
       panelLoading(busy, 'Watching for changes');
       if (cwd !== $('cwd').value.trim()) return; // folder changed while we were loading
@@ -8635,6 +12096,7 @@ Context ${pct}% of the model's window`;
       ps1: 'powershell', bat: 'dos', java: 'java', go: 'go', rb: 'ruby', rs: 'rust', php: 'php',
       sql: 'sql', c: 'c', h: 'c', cpp: 'cpp', hpp: 'cpp', cs: 'csharp', kt: 'kotlin', swift: 'swift',
       toml: 'ini', ini: 'ini', cfg: 'ini', feature: 'gherkin', vue: 'xml', tf: 'hcl',
+      robot: 'robot', resource: 'robot',
     };
     function langFor(path) {
       const ext = String(path).split('.').pop().toLowerCase();
@@ -8642,30 +12104,32 @@ Context ${pct}% of the model's window`;
       return lang && hljs.getLanguage(lang) ? lang : null;
     }
     // Highlights the code on each diff line, keeping the +/- marker outside the highlighting.
+    // A diff drawn like a review: numbered lines (each in the file it belongs to), added ones green, removed ones
+    // red; git's header lines are dropped and each jump between hunks says how many lines it skips. An untracked
+    // file comes as all-added lines without a hunk; anything else (an error, "binary file") is shown as a note.
     function diffToHtml(text, path) {
       const lang = langFor(path || '');
       if (!text || !text.trim()) return '<div class="diff-empty">No textual changes (binary file, or already committed).</div>';
+      const code = (t) => { if (!lang) return esc(t); try { return hljs.highlight(t, {language: lang, ignoreIllegals: true}).value; } catch { return esc(t); } };
+      const row = (cls, no, t) => `<div class="dl${cls ? ' ' + cls : ''}"><span class="no">${no}</span><span class="c">${code(t) || ' '}</span></div>`;
       const out = [];
+      let oldNo = 1, newNo = 1, started = false, hunks = 0;
       text.split('\n').forEach(line => {
-        const cls = line.startsWith('+++') || line.startsWith('---') ? 'meta'
-          : line.startsWith('@@') ? 'hunk'
-            : line.startsWith('+') ? 'add'
-              : line.startsWith('-') ? 'del'
-                : line.startsWith('diff ') || line.startsWith('index ') ? 'meta' : '';
-        let html;
-        if (lang && (cls === 'add' || cls === 'del' || cls === '')) {
-          const sign = cls ? line[0] : (line[0] === ' ' ? ' ' : '');
-          const code = line.slice(sign.length);
-          let body;
-          try { body = hljs.highlight(code, { language: lang, ignoreIllegals: true }).value; }
-          catch { body = esc(code); }
-          html = esc(sign) + body;
-        } else {
-          html = esc(line);
+        const h = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)$/);
+        if (h) {
+          const skipped = +h[2] - (hunks ? newNo : 1);
+          if (skipped > 0) out.push(`<div class="dgap">${skipped} unchanged line${skipped > 1 ? 's' : ''}${h[3].trim() ? ' · ' + esc(h[3].trim()) : ''}</div>`);
+          oldNo = +h[1]; newNo = +h[2]; started = true; hunks++;
+          return;
         }
-        out.push(`<span class="ln ${cls}">${html || ' '}</span>`);
+        if (line.startsWith('+++ ')) { started = true; return; }
+        if (!started || line.startsWith('\\') || line === '') return;   // headers, "\ No newline at end of file"
+        if (line[0] === '+') out.push(row('add', newNo++, line.slice(1)));
+        else if (line[0] === '-') out.push(row('del', oldNo++, line.slice(1)));
+        else { out.push(row('', newNo++, line.slice(1))); oldNo++; }
       });
-      return '<pre class="hljs">' + out.join('') + '</pre>';
+      if (!out.length) return `<div class="diff-empty">${esc(text.trim())}</div>`;
+      return '<div class="dcode hljs">' + out.join('') + '</div>';
     }
 
     async function fillDiff(section, f) {
@@ -8739,12 +12203,15 @@ Context ${pct}% of the model's window`;
         const sec = document.createElement('section');
         sec.className = 'dfile' + (seen ? ' viewed collapsed' : '');
         sec._file = f;
+        const dir = f.path.includes('/') || f.path.includes('\\') ? f.path.replace(/[\\/][^\\/]*$/, '') : '';
         sec.innerHTML = `<div class="dfile-head" title="${esc(f.path)}">
-            <span class="caret"></span>
-            <span class="ch-tag ${esc(f.status)}">${esc(f.status)}</span>
-            <span class="name">${esc(f.path)}</span>
-            ${f.added || f.removed ? `<span class="ch-nums"><span class="plus">+${f.added}</span> −${f.removed}</span>` : ''}
+            <span class="ic">${fileIcon(baseName(f.path))}</span>
+            <span class="name">${esc(baseName(f.path))}</span>
+            <span class="dir">${esc(dir)}</span>
+            ${f.status && f.status !== 'modified' ? `<span class="ch-tag ${esc(f.status)}">${esc(f.status)}</span>` : ''}
+            ${f.added || f.removed ? `<span class="ch-nums"><span class="plus">+${f.added}</span><span class="minus">−${f.removed}</span></span>` : ''}
             <button class="seen" title="${seen ? 'Mark as not viewed' : 'Mark as viewed (collapses it)'}">${ICON_EYE}</button>
+            <span class="caret"></span>
           </div><div class="dfile-body"></div>`;
         if (f.status !== 'deleted') Object.assign(sec.querySelector('.dfile-head').dataset, {fpath: f.path, fcwd: panelCwd || ''});
         sec.querySelector('.dfile-head').onclick = (e) => {
@@ -8808,13 +12275,16 @@ Context ${pct}% of the model's window`;
     { const w = store.get('gui.diffW', ''); if (w) document.documentElement.style.setProperty('--diff-w', w); }
     { const w = store.get('gui.filesW', ''); if (w) document.documentElement.style.setProperty('--files-w', w); }
 
-    // Card under a reply listing the files that run changed.
+    // Card under a reply: "2 files changed +119 −0 ›" (click to list them) and a Review button that opens the
+    // changes panel. Each listed file opens the panel at that file.
+    const ICON_REVIEW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>';
     function changesCard(files, cwd) {
-      // "Changed 3 files" / one row per file (icon, name, +added −removed) / "View all" with the totals
       const el = document.createElement('div'); el.className = 'changed-card';
       const total = files.reduce((a, f) => a + (f.added || 0), 0), gone = files.reduce((a, f) => a + (f.removed || 0), 0);
       const nums = (a, r) => `<span class="ch-nums"><span class="plus">+${a}</span><span class="minus">−${r}</span></span>`;
-      el.innerHTML = `<div class="ch-top">Changed ${files.length} file${files.length > 1 ? 's' : ''}</div>`;
+      el.innerHTML = `<div class="ch-top"><button class="ch-sum" title="Show the files">${files.length} file${files.length > 1 ? 's' : ''} changed ${nums(total, gone)}<span class="ch-chev"></span></button>`
+        + `<button class="ch-review" title="Open the changes">${ICON_REVIEW}Review</button></div><div class="ch-list"></div>`;
+      const list = el.querySelector('.ch-list');
       files.forEach(f => {
         const row = document.createElement('div');
         row.className = 'ch-file' + (f.status === 'deleted' ? ' gone' : '');
@@ -8823,12 +12293,10 @@ Context ${pct}% of the model's window`;
         row.innerHTML = `<span class="ic">${fileIcon(baseName(f.path))}</span><span class="name">${esc(baseName(f.path))}</span>` +
           (f.status === 'new' || f.status === 'added' ? '<span class="ch-new">new</span>' : '') + nums(f.added || 0, f.removed || 0);
         row.addEventListener('click', () => { openChanges(files, cwd); scrollToFile(f.path); });
-        el.appendChild(row);
+        list.appendChild(row);
       });
-      const all = document.createElement('div'); all.className = 'ch-all';
-      all.innerHTML = '<span>View all</span>' + nums(total, gone);
-      all.onclick = () => openChanges(files, cwd);
-      el.appendChild(all);
+      el.querySelector('.ch-sum').onclick = () => el.classList.toggle('open');
+      el.querySelector('.ch-review').onclick = () => openChanges(files, cwd);
       return el;
     }
 
@@ -8873,7 +12341,12 @@ Context ${pct}% of the model's window`;
     // Python: a 16×16 pixel-art icon drawn here (two interlocking snakes, the yellow one is the blue one turned
     // 180°), no external image.
     const ICON_PY = '<svg class="pix" viewBox="0 0 16 16" shape-rendering="crispEdges"><path fill="#3b77a8" d="M5 1h6v1h-6zM4 2h2v1h-2zM7 2h5v1h-5zM4 3h8v1h-8zM4 4h4v1h-4zM2 5h9v1h-9zM1 6h10v1h-10zM1 7h10v1h-10zM1 8h3v1h-3zM1 9h3v1h-3zM2 10h2v1h-2z"/><path fill="#f5c63c" d="M5 14h6v1h-6zM10 13h2v1h-2zM4 13h5v1h-5zM4 12h8v1h-8zM8 11h4v1h-4zM5 10h9v1h-9zM5 9h10v1h-10zM5 8h10v1h-10zM12 7h3v1h-3zM12 6h3v1h-3zM12 5h2v1h-2z"/></svg>';
+    // Robot Framework (.robot, .resource): the icon from vscode-icons (https://github.com/vscode-icons/vscode-icons,
+    // file_type_robotframework.svg, CC BY-SA 4.0). Changed: the white circle behind the robot is removed and the robot
+    // takes the text colour, so it sits on dark and light surfaces alike.
+    const ICON_ROBOT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="currentColor"><path d="M10.387 14.6a2.727 2.727 0 0 1 5.453 0 .99.99 0 1 1-1.98 0 .746.746 0 0 0-1.492 0 .99.99 0 1 1-1.98 0m11.3 4.586a.99.99 0 0 1-.992.992h-9.188a.992.992 0 0 1 0-1.984h9.184a.994.994 0 0 1 .992.992m-4.293-4.026a.99.99 0 0 1 .27-1.375l2.293-1.551a.989.989 0 1 1 1.109 1.637l-2.3 1.551a.97.97 0 0 1-.551.172 1 1 0 0 1-.824-.434m6.289 6.094a.7.7 0 0 1-.207.5l-1.707 1.707a.7.7 0 0 1-.5.207H10.8a.7.7 0 0 1-.5-.207l-1.7-1.707a.7.7 0 0 1-.207-.5V10.8a.7.7 0 0 1 .207-.5l1.7-1.706a.7.7 0 0 1 .5-.207h10.466a.7.7 0 0 1 .5.207l1.707 1.706a.7.7 0 0 1 .207.5ZM25.129 9.16 22.9 6.93a1.8 1.8 0 0 0-1.271-.53H10.438a1.8 1.8 0 0 0-1.273.527L6.938 9.16a1.8 1.8 0 0 0-.527 1.27v11.191a1.8 1.8 0 0 0 .527 1.273l2.227 2.23a1.8 1.8 0 0 0 1.273.523h11.191a1.8 1.8 0 0 0 1.273-.523l2.227-2.23a1.78 1.78 0 0 0 .527-1.273V10.434a1.78 1.78 0 0 0-.527-1.273"/></svg>';
     function fileIcon(name) {
+      if (/\.(robot|resource)$/i.test(name)) return `<span class="ftype">${ICON_ROBOT}</span>`;
       if (IMG_RE.test(name)) return `<span class="ftype">${ICON_IMAGE}</span>`;
       if (/\.pyw?$/i.test(name)) return `<span class="ftype">${ICON_PY}</span>`;
       const t = FTYPES.find(([re]) => re.test(name));
@@ -8883,6 +12356,7 @@ Context ${pct}% of the model's window`;
 
     function setPanelTab(tab) {
       panelTab = tab;
+      store.set('gui.panelTab', tab);
       document.querySelectorAll('.dp-tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
       $('diffBody').hidden = tab !== 'changes';
       $('filesBody').hidden = tab !== 'files';
@@ -8915,12 +12389,28 @@ Context ${pct}% of the model's window`;
       if (!$('fileTree').childElementCount) renderTree(); else refreshTreeSoon();
       fitFilesLayout();
     }
+    function saveTabsState() {
+      if (!treeCwd) return;
+      store.set('gui.tabs:' + treeCwd, {
+        tabs: openTabs.map(t => t.path),
+        active: viewing ? viewing.path : null
+      });
+    }
     function resetTree(cwd) {
       treeCwd = cwd; treeOpen.clear();
       $('fileTree').innerHTML = '';
       $('fxFilter').value = '';
-      openTabs = []; viewing = null;
-      renderTabs(); showEmptyView();
+      const saved = store.get('gui.tabs:' + cwd, null);
+      if (saved && Array.isArray(saved.tabs)) {
+        openTabs = saved.tabs.map(p => ({path: p, cwd}));
+        viewing = null;
+        renderTabs();
+        if (saved.active) setTimeout(() => viewFile(saved.active, cwd), 0);
+        else showEmptyView();
+      } else {
+        openTabs = []; viewing = null;
+        renderTabs(); showEmptyView();
+      }
     }
 
     // The sidebar sits beside the file when there is room, and over it when the panel is narrow.
@@ -9150,6 +12640,20 @@ Context ${pct}% of the model's window`;
         box.appendChild(el);
       });
       box.querySelector('.fx-tab.on')?.scrollIntoView({block: 'nearest', inline: 'nearest'});
+      renderFvPath();
+    }
+    // The path of the open file under the tabs: "project › folder › file". A file outside the project shows its
+    // own folders (the last few of them) instead.
+    function renderFvPath() {
+      const bar = $('fvCrumbs');
+      if (!viewing) { bar.hidden = true; bar.innerHTML = ''; return; }
+      let parts = String(viewing.rel || viewing.path).split(/[\\/]+/).filter(Boolean);
+      if (viewing.rel !== viewing.path) parts.unshift(baseName(viewing.cwd || '') || 'Project');
+      else if (parts.length > 4) parts = ['…', ...parts.slice(-3)];
+      bar.innerHTML = parts.map((x, i) => i === parts.length - 1
+        ? `<span class="cur">${esc(x)}</span>` : `<span>${esc(x)}</span><i class="sep">›</i>`).join('');
+      bar.title = viewing.path;
+      bar.hidden = false;
     }
     function closeTab(p) {
       const i = openTabs.findIndex(t => samePath(t.path, p));
@@ -9164,9 +12668,10 @@ Context ${pct}% of the model's window`;
         viewing = null; showEmptyView();
       }
       renderTabs(); markActiveRow(); fitFilesLayout();
+      saveTabsState();
     }
     function showEmptyView() {
-      $('fvHead').hidden = true; $('fvFindBar').hidden = true; $('fvBody').hidden = true;
+      $('fvHead').hidden = true; $('fvFindBar').hidden = true; $('fvBody').hidden = true; $('fvCrumbs').hidden = true;
       $('fvBody').innerHTML = ''; $('fvEmpty').hidden = false;
       clearFind();
     }
@@ -9448,6 +12953,7 @@ Context ${pct}% of the model's window`;
       }
       viewing = {path: abs, cwd, rel: relPath(abs, cwd)};
       renderTabs(); markActiveRow(); revealInTree(abs, cwd);
+      saveTabsState();
       if ($('filesBody').classList.contains('narrow')) $('filesBody').dataset.sideOpen = '';
       fitFilesLayout();
       $('fvEmpty').hidden = true; $('fvHead').hidden = false; $('fvBody').hidden = false;
@@ -9776,16 +13282,52 @@ Context ${pct}% of the model's window`;
         const cwd = $('cwd').value.trim();
         if (!cwd || !root.isConnected) return;
         const want = new Map();
-        const apply = (c, hit, line) => {
-          if (!hit) return;
+        // the icon in front of a name: the folder icon, or the file's type badge (as in the file tree)
+        const decorate = (c, text, dir) => {
+          if (c.querySelector(':scope > .fi')) return;
+          // a long path is cut to its last part, the file or folder name (a ":12" line number stays); the full path
+          // is in the tooltip
+          const tn = [...c.childNodes].find(n => n.nodeType === 3);
+          if (tn && text.length > 30 && /[\\/]/.test(text.replace(/[\\/]+$/, ''))) {
+            const m = tn.textContent.trim().match(/^(.*?)((?::\d+){1,2})?$/);
+            tn.textContent = baseName(m[1]) + (m[2] || '');
+            c.title = (c.title ? c.title + '\n' : '') + text;
+          }
+          const s = document.createElement('span'); s.className = 'fi';
+          s.innerHTML = dir ? ICON_FOLDER : fileIcon(baseName(text));
+          c.prepend(s);
+          // a chip never splits in the middle (CSS: nowrap); one wider than its line wraps inside its own box instead
+          requestAnimationFrame(() => {
+            const host = c.parentElement;
+            if (host && host.clientWidth && c.getBoundingClientRect().width > host.clientWidth - 4) c.classList.add('flong');
+          });
+        };
+        // A name that is not in this folder still gets the icon (dashed, dimmer) when it clearly is a path:
+        // a file with a known type, or something that starts like a path ("./x", "~/x", "C:\x") or has two parts.
+        const KNOWN_EXT = /\.(csv|tsv|pdf|zip|docx?|xlsx?|pptx?|robot|resource|properties|gradle|mp4|mp3|wav|wasm|ipynb|webp|ico)$/i;
+        const looksLikePath = (t) => /\.[A-Za-z0-9]{1,8}$/.test(t)
+          ? /[\\/]/.test(t) || (!/^(console|window|document|logger|log|self|this)\./i.test(t)     // code, not files
+            && (FTYPES.some(([re]) => re.test(t)) || IMG_RE.test(t) || KNOWN_EXT.test(t)))
+          : /^([A-Za-z]:|\.{1,2}[\\/]|~|[\\/])/.test(t) || (t.match(/[\\/]/g) || []).length >= 2 || /[\\/]$/.test(t);
+        const apply = (c, hit, line, text) => {
+          if (!hit) {
+            if (looksLikePath(text)) {
+              c.classList.add('fmiss'); c.title = 'Not found in this folder';
+              decorate(c, text, /[\\/]$/.test(text) || !/\.[A-Za-z0-9]{1,8}$/.test(text));
+            }
+            return;
+          }
           c.classList.add('fileref');
           c.dataset.fpath = hit.path; c.dataset.fcwd = cwd;
           if (hit.dir) c.dataset.fdir = '1';
           if (line) c.dataset.fline = line;
-          c.title = (hit.dir ? 'Show this folder' : 'Open this file') + ' · right-click for more';
+          // a name found in a folder below (the reply gave no path) says where: "Open OmsLib/envData/x.json"
+          c.title = (hit.rel ? (hit.dir ? 'Show ' : 'Open ') + hit.rel + (hit.matches > 1 ? ` (the nearest of ${hit.matches} with this name)` : '')
+            : (hit.dir ? 'Show this folder' : 'Open this file')) + ' · right-click for more';
+          decorate(c, text, !!hit.dir);
         };
         root.querySelectorAll('code').forEach(c => {
-          if (c.closest('pre') || c.classList.contains('fileref')) return;
+          if (c.closest('pre') || c.classList.contains('fileref') || c.classList.contains('fmiss')) return;
           const t = c.textContent.trim();
           if (t.length > 260 || /^\w+:\/\//.test(t)) return;
           const m = t.match(/^((?:[A-Za-z]:)?[^\s:*?"<>|]+)(?::(\d+)(?::\d+)?)?$/);
@@ -9793,7 +13335,7 @@ Context ${pct}% of the model's window`;
           const p = m[1];
           if (!(/[\\/]/.test(p) || /\.[A-Za-z][A-Za-z0-9]{0,7}$/.test(p)) || /^[\d.]+$/.test(p)) return;
           const cached = refCache.get(cwd + '|' + p);
-          if (cached && (cached.hit || Date.now() - cached.at < 5000)) return apply(c, cached.hit, m[2]);
+          if (cached && (cached.hit || Date.now() - cached.at < 5000)) return apply(c, cached.hit, m[2], p);
           if (!want.has(p)) want.set(p, []);
           want.get(p).push([c, m[2]]);
         });
@@ -9803,7 +13345,7 @@ Context ${pct}% of the model's window`;
           .then(found => want.forEach((list, p) => {
             const hit = found[p] || null;
             refCache.set(cwd + '|' + p, {hit, at: Date.now()});
-            list.forEach(([c, line]) => apply(c, hit, line));
+            list.forEach(([c, line]) => apply(c, hit, line, p));
           }))
           .then(() => imageStrip(root))
           .catch(() => {});
@@ -9822,15 +13364,38 @@ Context ${pct}% of the model's window`;
     fileMenu.className = 'chatmenu fmenu';
     document.body.appendChild(fileMenu);
     let fileMenuRow = null;
+    function fetchAppInfo() {
+      fetch('/api/info?cwd=' + encodeURIComponent($('cwd').value.trim() || '')).then(r => r.json()).then(i => {
+        appInfo = i || {};
+        showUser(appInfo.user);
+        if (appInfo.branch !== undefined) updateBranch(appInfo.branch || '');
+      }).catch(() => {});
+    }
     let appInfo = {};
-    fetch('/api/info').then(r => r.json()).then(i => { appInfo = i || {}; showUser(appInfo.user); }).catch(() => {});
-    // the signed-in account at the bottom of the sidebar
+    fetchAppInfo();
+
+    $('branchPill').onclick = async () => {
+      await fetchBranch();
+      const b = $('branchLabel').textContent.trim();
+      if (b) {
+        await copyText(b);
+        toast('Copied branch: ' + b);
+      }
+    };
+    window.addEventListener('focus', () => { fetchBranch(); loadChanges(true); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') { fetchBranch(); loadChanges(true); }
+    });
+    setInterval(() => {
+      if (document.visibilityState === 'visible' && !busy) fetchBranch();
+    }, 8000);
+    // the signed-in account, shown in Settings navigation sidebar
     function showUser(u) {
       if (!u || !(u.name || u.email)) return;
       const name = u.name || u.email;
       $('whoName').textContent = name;
-      $('who').title = u.email ? 'Signed in to Gemini as ' + u.email : 'Signed in as ' + name;
-      $('who').hidden = false;
+      $('who').title = u.email ? 'Signed in as ' + name + ' (' + u.email + ')' : 'Signed in as ' + name;
+      $('accountSec').hidden = false;
     }
     function closeFileMenu() {
       fileMenu.classList.remove('open');
@@ -9973,6 +13538,7 @@ Context ${pct}% of the model's window`;
     function setBusy(b) {
       busy = b;
       const s = $('send');
+      s.classList.remove('stopping');
       s.classList.toggle('stop', b);
       s.title = b ? 'Stop' : 'Send';
       s.innerHTML = b ? ICON_STOP : ICON_SEND;
@@ -9980,10 +13546,20 @@ Context ${pct}% of the model's window`;
       if (typeof updateToBottom === 'function') updateToBottom();
     }
     $('send').onclick = () => {
-      if (busy) {fetch('/api/stop', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({runId})}); controller?.abort();}
+      if (busy) {
+        if ($('send').classList.contains('stopping')) return;
+        $('send').classList.add('stopping'); $('send').title = 'Stopping…';
+        $('send').innerHTML = '<span class="stop-spin"></span>';        // a spinner until the run has really ended
+        fetch('/api/stop', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({runId})}); controller?.abort();
+      }
       else send();
     };
-    function autosize() {const t = $('input'); t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; if (!busy) $('send').disabled = !t.value.trim() && !attachments.length;}
+    // At a zoom other than 100% scrollHeight is rounded and can sit a pixel over the box, which showed an empty
+    // scrollbar; the scrollbar only appears once the text is taller than the box's max height.
+    function autosize() {const t = $('input'); t.style.height = 'auto'; const h = t.scrollHeight; t.style.height = h + 'px';
+      t.style.overflowY = h > parseFloat(getComputedStyle(t).maxHeight) + 1 ? 'auto' : 'hidden'; if (!busy) $('send').disabled = !t.value.trim() && !attachments.length;
+      mirrorUpdate();}
+    $('input').addEventListener('scroll', () => { $('inMirror').scrollTop = $('input').scrollTop; });
     $('input').addEventListener('input', (e) => {
       autosize(); saveDraft();
       if (e.isTrusted && dictation && !e.inputType?.startsWith('insertFromDictation')) stopDictation();   // typing takes over
@@ -10167,7 +13743,7 @@ Context ${pct}% of the model's window`;
       const had = nextPrompt !== null;
       nextPrompt = s || null;
       if (nextPrompt) $('input').placeholder = nextPromptPreview(nextPrompt);
-      else if (had) syncPills();                         // back to "Message Gemini" (or the mode's text)
+      else if (had) syncPills();                         // back to "Ask anything, / for actions" (or the mode's text)
       autosize();
     }
     $('input').addEventListener('keydown', (e) => {
@@ -10242,9 +13818,6 @@ Context ${pct}% of the model's window`;
           document.body.classList.remove('peek');
         }, 300);
       };
-      $('sideEdge').addEventListener('pointerenter', peek);
-      $('menu').addEventListener('pointerenter', peek);
-      $('menu').addEventListener('pointerleave', unpeek);
       $('side').addEventListener('pointerenter', () => clearTimeout(peekOff));
       $('side').addEventListener('pointerleave', unpeek);
     }
@@ -10254,7 +13827,7 @@ Context ${pct}% of the model's window`;
     document.addEventListener('pointerdown', (e) => {
       if (document.body.classList.contains('pinned') && !$('side').contains(e.target) && !$('menu').contains(e.target)) setCollapsed(true);
     });
-    $('menu').onclick = () => {if (isMobile()) {$('side').classList.add('open'); $('scrim').classList.add('open');} else setCollapsed(false);};
+    $('menu').onclick = () => {if (isMobile()) {$('side').classList.add('open'); $('scrim').classList.add('open');} else setCollapsed(sideIsOpen());};
     // While the sidebar is only peeking (shown over the page by hovering), this same button pins it open.
     $('collapse').onclick = () => {
       if (isMobile()) closeSide();
@@ -10442,6 +14015,7 @@ Context ${pct}% of the model's window`;
       .observe($('log'), {childList: true});
     const startChat = new URLSearchParams(location.search).get('chat');
     syncPills(); setBusy(false); if (startChat) renderLoading(); else renderEmpty(); updateHint(); restoreDraft(); loadChanges(); loadQuota(); loadModels();
+
     // Restore the chat from the URL (?chat=<session id>) so a reload lands where you were.
     (async () => {
       await loadSessions();
