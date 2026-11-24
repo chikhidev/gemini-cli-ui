@@ -65,10 +65,13 @@
       const COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.5"/><path d="M15.5 8.5V6A2 2 0 0 0 13.5 4H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/></svg>';
       const TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.8 12.5h9.4L17.5 7M10 11v5M14 11v5"/></svg>';
       const PENCIL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4.5 19.5 9 9 19.5 4 20l.5-5zM12.5 7l4.5 4.5"/></svg>';
-      chatMenu.innerHTML = `<button data-a="rename">${PENCIL}<span>Rename</span></button>`
+      const pinned = isPinnedChat(s.id);
+      chatMenu.innerHTML = `<button data-a="pin">${ICON_PIN}<span>${pinned ? 'Unpin' : 'Pin'}</span></button>`
+        + `<button data-a="rename">${PENCIL}<span>Rename</span></button>`
         + `<button data-a="copy">${COPY}<span>Copy session ID</span></button>`
         + `<div class="sid" title="${esc(s.id)}">${esc(s.id)}</div><hr>`
         + `<button data-a="delete" class="danger">${TRASH}<span>Delete</span></button>`;
+      chatMenu.querySelector('[data-a=pin]').onclick = (e) => { e.stopPropagation(); closeChatMenu(); togglePinChat(s.id); };
       chatMenu.querySelector('[data-a=copy]').onclick = async (e) => {
         e.stopPropagation();
         const span = e.currentTarget.querySelector('span');

@@ -4,7 +4,7 @@
     // The panel belongs to one folder: drop stale files when the chat (and folder) changes.
     function resetChangesPanel() {
       panelFiles = null; panelCwd = null; changedFiles = []; notARepo = false; renderedKey = null;
-      $('changesPill').hidden = true;
+      syncDiffButton();
       $('diffBody').innerHTML = ''; diffCache.clear();
       
       setTimeout(() => {
@@ -22,11 +22,10 @@
       if (quiet && Date.now() - lastChangeCheck < 1500) return;
       lastChangeCheck = Date.now();
       const cwd = $('cwd').value.trim();
-      const pill = $('changesPill');
       changedCwd = cwd;
       if (!quiet) panelLoading(true, 'Loading changes');
       else if (busy) panelLoading(true, 'Watching for changes');
-      if (!cwd) { pill.hidden = true; changedFiles = []; return; }
+      if (!cwd) { changedFiles = []; syncDiffButton(); return; }
       let repo = true;
       try {
         const d = await (await fetch('/api/changes?cwd=' + encodeURIComponent(cwd))).json();
@@ -37,15 +36,11 @@
       panelLoading(busy, 'Watching for changes');
       if (cwd !== $('cwd').value.trim()) return; // folder changed while we were loading
       notARepo = !repo;
-      pill.classList.toggle('changed', !!changedFiles.length);
       syncDiffButton();
-      $('changesLabel').textContent = changedFiles.length > 999 ? '999+' : changedFiles.length;
-      pill.title = (changedFiles.length === 1 ? '1 file changed' : changedFiles.length + ' files changed')
-        + ' in this folder — click to review';
+      if (overviewMenu.classList.contains('open')) renderOverviewMenu();
       markTreeChanges();
       if (panelTab !== 'changes') return;
-      if (!changedFiles.length && $('diffPanel').classList.contains('open') && !panelFiles) closeDiffPanel();
-      else if ($('diffPanel').classList.contains('open') && !panelFiles) openChanges();
+      if ($('diffPanel').classList.contains('open') && !panelFiles) openChanges();
     }
     // Same shimmer as the chat's "Thinking" line.
     function panelLoading(on, label) {
@@ -212,22 +207,75 @@
       box.scrollTop = prevScroll;
     }
 
-    $('changesPill').onclick = () => {
-      const sameFolder = panelCwd === $('cwd').value.trim();
-      if ($('diffPanel').classList.contains('open') && !panelFiles && sameFolder) return closeDiffPanel();
-      openChanges();
-    };
+    // ---------- Overview menu (top-right: Review & Files) ----------
+    const ICON_OV_REVIEW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.5h8.5L20 7v11a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 18V5A1.5 1.5 0 0 1 8 3.5z"/><path d="M16 3.5V7h3.5M13.2 10.5v4.4M11 12.7h4.4"/><path d="M4 7.5v12A1.5 1.5 0 0 0 5.5 21H16"/></svg>';
+    const ICON_OV_FILES = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 4.5a1 1 0 0 1 1-1H14l4.5 4.5v11.5a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1z"/><path d="M14 3.5V8h4.5"/></svg>';
+    const overviewMenu = document.createElement('div');
+    overviewMenu.className = 'chatmenu ov-menu';
+    document.body.appendChild(overviewMenu);
+    function closeOverviewMenu() {
+      overviewMenu.classList.remove('open');
+      syncDiffButton();
+    }
+    function renderOverviewMenu() {
+      const open = $('diffPanel').classList.contains('open');
+      const added = changedFiles.reduce((a, f) => a + (f.added || 0), 0);
+      const removed = changedFiles.reduce((a, f) => a + (f.removed || 0), 0);
+      const nums = (added || removed)
+        ? `<span class="ov-nums"><span class="plus">+${added}</span><span class="minus">-${removed}</span></span>`
+        : (changedFiles.length ? `<span class="ov-nums"><span class="plus">${changedFiles.length}</span></span>` : '');
+      overviewMenu.innerHTML = `<div class="ov-head">Overview</div>`
+        + `<button data-tab="changes" class="${open && panelTab === 'changes' ? 'on' : ''}">${ICON_OV_REVIEW}<span>Review</span>${nums}</button>`
+        + `<button data-tab="files" class="${open && panelTab === 'files' ? 'on' : ''}">${ICON_OV_FILES}<span>Files</span></button>`;
+      overviewMenu.querySelectorAll('button[data-tab]').forEach(b => b.onclick = (e) => {
+        e.stopPropagation();
+        const tab = b.dataset.tab;
+        const isOpen = $('diffPanel').classList.contains('open');
+        closeOverviewMenu();
+        // If the other view is open, take its place; if this view is already open, close it.
+        if (tab === 'files') {
+          if (isOpen && panelTab === 'files') closeDiffPanel();
+          else openFiles();
+        } else {
+          if (isOpen && panelTab === 'changes' && !panelFiles && panelCwd === $('cwd').value.trim()) closeDiffPanel();
+          else openChanges();
+        }
+      });
+    }
+    function openOverviewMenu() {
+      renderOverviewMenu();
+      overviewMenu.classList.add('open');
+      syncDiffButton();
+      const r = $('overviewBtn').getBoundingClientRect(), w = overviewMenu.offsetWidth, h = overviewMenu.offsetHeight;
+      overviewMenu.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px';
+      overviewMenu.style.top = Math.max(8, Math.min(r.bottom + 6, innerHeight - h - 8)) + 'px';
+    }
+    if ($('overviewBtn')) {
+      $('overviewBtn').onclick = (e) => {
+        e.stopPropagation();
+        overviewMenu.classList.contains('open') ? closeOverviewMenu() : openOverviewMenu();
+      };
+    }
+    document.addEventListener('mousedown', (e) => {
+      if (overviewMenu.classList.contains('open') && !e.target.closest('.ov-menu, #overviewBtn')) closeOverviewMenu();
+    }, true);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && overviewMenu.classList.contains('open')) { e.stopPropagation(); closeOverviewMenu(); }
+    }, true);
+    window.addEventListener('resize', closeOverviewMenu);
+
     function closeDiffPanel() {
       $('diffPanel').classList.remove('open');
       document.body.classList.remove('panel-max'); $('diffMax').title = 'Expand over the chat';   // closing an expanded panel must bring the chat back
       store.set('gui.diffOpen', false);
       syncDiffButton();
     }
-    // The top-right button is only useful while the panel is closed.
     function syncDiffButton() {
+      const btn = $('overviewBtn'); if (!btn) return;
       const open = $('diffPanel').classList.contains('open');
-      $('changesPill').hidden = open || !changedFiles.length;
-      $('filesBtn').hidden = open || !$('cwd').value.trim();
+      btn.hidden = !$('cwd').value.trim();
+      btn.classList.toggle('on', open || overviewMenu.classList.contains('open'));
+      btn.classList.toggle('changed', !!changedFiles.length);
     }
     $('diffClose').onclick = closeDiffPanel;
     $('diffRefresh').onclick = async () => {
@@ -337,17 +385,12 @@
     function setPanelTab(tab) {
       panelTab = tab;
       store.set('gui.panelTab', tab);
-      document.querySelectorAll('.dp-tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
       $('diffBody').hidden = tab !== 'changes';
       $('filesBody').hidden = tab !== 'files';
       $('diffPanel').classList.toggle('files', tab === 'files');
       $('fxTreeToggle').hidden = tab !== 'files';
       $('diffRefresh').title = tab === 'files' ? 'Reload' : 'Refresh';
     }
-    document.querySelectorAll('.dp-tabs button').forEach(b => b.onclick = () => {
-      if (b.dataset.tab === 'files') openFiles(); else openChanges(panelFiles, panelCwd);
-    });
-    $('filesBtn').onclick = () => openFiles();
 
     // expand the panel over the chat, and back
     const syncMaxTitle = () => { $('diffMax').title = document.body.classList.contains('panel-max') ? 'Back to the chat' : 'Expand over the chat'; };

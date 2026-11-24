@@ -98,14 +98,14 @@
     async function loadModels(force) {
       let d;
       try { d = await (await fetch('/api/models' + (force ? '?force=1' : ''))).json(); } catch { return; }
-      if (!d || !d.models || !d.models.length) return;          // keep the built-in fallback list
+      if (!d || (!(d.models && d.models.length) && !(d.auto && d.auto.length))) return;
       const sel = $('model'), keep = store.get('gui.model', sel.value);
       const opt = (v, t) => `<option value="${esc(v)}">${esc(t)}</option>`;
       let html = opt('', 'Auto (CLI default)');
       const autos = [...(d.auto || [])].sort((a, b) => modelVersion(b) - modelVersion(a));
       if (autos.length) html += `<optgroup label="Auto routing">${autos.map(a => opt(a, 'Auto · Gemini ' + a.replace('auto-gemini-', ''))).join('')}</optgroup>`;
       // same order as the CLI's /model manage picker (the server already picked and ordered them)
-      html += `<optgroup label="Models">${d.models.map(id => opt(id, modelLabel(id))).join('')}</optgroup>`;
+      if (d.models && d.models.length) html += `<optgroup label="Models">${d.models.map(id => opt(id, modelLabel(id))).join('')}</optgroup>`;
       sel.innerHTML = html;
       sel.value = keep;
       if (sel.selectedIndex < 0) sel.value = '';                // a saved model that is no longer offered

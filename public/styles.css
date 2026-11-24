@@ -67,32 +67,34 @@
     }
 
     :root[data-theme="light"] {
-      --bg: #f9f9f9;
-      --surface: #ffffff;          /* cards, sidebar: white, a step above the off-white page (as dark mode does) */
-      --surface2: #ececec;
-      --hover: #efefef;            /* must still show on white */
-      --line: #e5e5e5;
-      --line2: #d6d6d6;
-      --text: #000;
-      --text2: #333;
-      --muted: #8a8a8a;
-      --faint: #cfcfcf;
-      --code: #ffffff;             /* code blocks match the cards */
+      --grad-a: #5b5fc7;
+      --grad-b: #4a4eb5;
+      --bg: #ffffff;               /* main chat card and file viewer: crisp white sheet */
+      --surface: #f2f4f7;          /* outer app chrome and sidebar: soft cool-stone neutral */
+      --surface2: #e6e9ef;
+      --hover: #e2e6ed;
+      --line: #dfe3eb;
+      --line2: #cdd3de;
+      --text: #111827;
+      --text2: #374151;
+      --muted: #646d7c;
+      --faint: #cbd0da;
+      --code: #f6f8fa;
       --composer-bg: #ffffff;
-      --composer-line: #b3b3b3;    /* crisper than the card borders */
-      --composer-ph: #7a7a7a;
-      --composer-ic: #5f5f5f;
-      --composer-hover: #ececec;
-      --send-off-bg: #e2e2e2;
-      --send-off-fg: #a0a0a0;
-      --send-bg: #1d1d1d;
+      --composer-line: #d4d8e2;
+      --composer-ph: #7c8494;
+      --composer-ic: #4b5563;
+      --composer-hover: #eef0f5;
+      --send-off-bg: #e2e5ec;
+      --send-off-fg: #9ca3af;
+      --send-bg: #111827;
       --send-fg: #fff;
-      --gutter: #b0b0b0;
+      --gutter: #9ca3af;
       --side-btn: #ffffff;
-      --side-btn-line: #dedede;
-      --side-active: #e8e8e8;
-      --bubble: #efefef;
-      --bubble-line: #e3e3e3;
+      --side-btn-line: #d5d9e2;
+      --side-active: #e1e5ee;
+      --bubble: #f1f3f8;
+      --bubble-line: #dfe3ec;
     }
 
     /* a display rule must never beat the hidden attribute */
@@ -6353,7 +6355,7 @@
     }
 
     .dp-head .fx-tabs {
-      margin-left: 10px
+      margin-left: 0
     }
 
     .fx-tab {
@@ -7622,8 +7624,8 @@
     }
 
     :root[data-theme="light"] {
-      --glass: inset 0 1px 0 rgba(0, 0, 0, .07), inset 0 1.5px 1px -1px rgba(0, 0, 0, .02);
-      --glass-strong: inset 0 1px 0 rgba(0, 0, 0, .10), inset 0 1.5px 1px -1px rgba(0, 0, 0, .03)
+      --glass: inset 0 1px 0 rgba(255, 255, 255, .85);
+      --glass-strong: inset 0 1px 0 rgba(255, 255, 255, .95)
     }
 
     .msg.user .bubble,
@@ -7701,16 +7703,15 @@
       max-width: var(--chat-w);
       margin: 0 auto;
       padding: 5px;
-      border: 1px solid color-mix(in srgb, var(--text) 14%, var(--composer-line));
       border-radius: 23px;
       background: color-mix(in srgb, var(--composer-bg) 42%, var(--bg));
-      box-shadow: var(--glass-strong), 0 10px 18px rgba(0, 0, 0, .3)
+      /* box-shadow: var(--glass-strong), 0 10px 18px rgba(0, 0, 0, .3) */
     }
 
     :root[data-theme="light"] .composer-shell {
-      border-color: color-mix(in srgb, var(--text) 18%, var(--line2));
-      background: color-mix(in srgb, var(--surface2) 55%, var(--bg));
-      box-shadow: var(--glass-strong), 0 8px 18px rgba(0, 0, 0, .06)
+      border-color: #d6dae4;
+      background: #f0f2f6;
+      box-shadow: var(--glass-strong), 0 8px 22px rgba(15, 23, 42, .06)
     }
 
     .composer {
@@ -7723,9 +7724,14 @@
       box-shadow: var(--glass-strong)
     }
 
-    :root[data-theme="light"] .composer,
+    :root[data-theme="light"] .composer {
+      border-color: #d4d8e2;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, .04)
+    }
+
     :root[data-theme="light"] .composer:focus-within {
-      box-shadow: var(--glass-strong)
+      border-color: #b4bccb;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, .07)
     }
 
     .composer-foot {
@@ -9051,4 +9057,284 @@
     /* the chat's scrollbar ends where the message box starts, not at the bottom of the window */
     main:not(.fresh) #chat::-webkit-scrollbar-track {
       margin-bottom: max(0px, calc(var(--composer-h, 140px) - 22px))
+    }
+
+    /* ---------- sidebar: pin folders and chats, view/filter menu ---------- */
+    .label {
+      gap: 4px;
+      padding: 6px 10px 4px 16px !important
+    }
+
+    .label .lbl-t {
+      margin-right: auto
+    }
+
+    .side-view-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px
+    }
+
+    .side-view-btn svg {
+      width: 14px;
+      height: 14px
+    }
+
+    .side-view-btn.on,
+    .side-view-btn.open {
+      color: var(--text);
+      background: var(--hover)
+    }
+
+    .side-view-btn.on {
+      color: var(--accent)
+    }
+
+    .g-pin {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      opacity: 0;
+      transition: all .15s
+    }
+
+    .g-pin svg {
+      width: 12px;
+      height: 12px
+    }
+
+    .g-head:hover .g-pin,
+    .group.pinned .g-pin {
+      opacity: 1
+    }
+
+    .group.pinned .g-pin {
+      color: var(--accent)
+    }
+
+    .g-pin:hover {
+      color: var(--text);
+      background: var(--line2)
+    }
+
+    .g-head.menu-open {
+      background: var(--hover);
+      color: var(--text)
+    }
+
+    .sess.pinned {
+      padding-left: 14px;
+      display: flex;
+      align-items: center;
+      gap: 5px
+    }
+
+    .sess .pin-mark {
+      width: 12px;
+      height: 12px;
+      flex: none;
+      color: var(--muted);
+      display: inline-flex
+    }
+
+    .sess .pin-mark svg {
+      width: 12px;
+      height: 12px
+    }
+
+    .sess.pinned .t {
+      flex: 1;
+      min-width: 0
+    }
+
+    .g-items.flat {
+      display: block
+    }
+
+    .g-items.flat .sess {
+      padding-left: 12px
+    }
+
+    .g-items.flat .g-more {
+      padding-left: 12px
+    }
+
+    .side-menu,
+    .side-menu .flyout,
+    .ov-menu {
+      background: var(--surface);
+      border: 1px solid var(--line2);
+      color: var(--text);
+      box-shadow: var(--glass), 0 16px 40px rgba(0, 0, 0, .45)
+    }
+
+    :root[data-theme="light"] .side-menu,
+    :root[data-theme="light"] .side-menu .flyout,
+    :root[data-theme="light"] .ov-menu {
+      box-shadow: var(--glass), 0 12px 32px rgba(0, 0, 0, .12)
+    }
+
+    .side-menu {
+      min-width: 240px
+    }
+
+    .side-menu .sub > button::after {
+      margin-left: 8px
+    }
+
+    .side-menu .sub > button span {
+      margin-right: auto
+    }
+
+    .side-menu .mv {
+      font-style: normal;
+      color: var(--muted);
+      font-size: 12px
+    }
+
+    .side-menu .flyout {
+      min-width: 170px
+    }
+
+    .side-menu .flyout button span {
+      margin-right: auto
+    }
+
+    .side-menu .tick {
+      width: 14px;
+      height: 14px;
+      margin-left: 10px;
+      color: var(--accent)
+    }
+
+    /* ---------- top-right Overview button & popover (Review / Files) ---------- */
+    #overviewBtn.on {
+      background: var(--surface2);
+      color: var(--text)
+    }
+
+    #overviewBtn.changed:not(.on) {
+      color: var(--accent)
+    }
+
+    .ov-menu {
+      min-width: 230px;
+      padding: 6px;
+      border-radius: 13px
+    }
+
+    .ov-menu .ov-head {
+      padding: 6px 10px 5px;
+      font-size: 11.5px;
+      font-weight: 400;
+      color: var(--muted)
+    }
+
+    .ov-menu button {
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      gap: 10px;
+      color: var(--text2)
+    }
+
+    .ov-menu button.on {
+      background: var(--hover);
+      color: var(--text)
+    }
+
+    .ov-menu button svg {
+      width: 16px;
+      height: 16px;
+      color: var(--muted)
+    }
+
+    .ov-menu button:hover svg,
+    .ov-menu button.on svg {
+      color: var(--text)
+    }
+
+    .ov-nums {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12.5px;
+      font-variant-numeric: tabular-nums
+    }
+
+    .ov-nums .plus {
+      color: var(--ok, #34c77b)
+    }
+
+    .ov-nums .minus {
+      color: #ff6b6b
+    }
+
+    /* ---------- light theme polish: crisp borders, legible toolbar controls, soft elevation shadows ---------- */
+    :root[data-theme="light"] main {
+      box-shadow: 0 1px 4px rgba(15, 23, 42, .04)
+    }
+
+    :root[data-theme="light"] .new-row .side-act {
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04)
+    }
+
+    :root[data-theme="light"] .new-row .side-act:hover {
+      background: #f8f9fb;
+      border-color: #c5cbd8
+    }
+
+    :root[data-theme="light"] .c-bar #attachBtn,
+    :root[data-theme="light"] .c-bar #approvalPill,
+    :root[data-theme="light"] .c-bar #modelPill,
+    :root[data-theme="light"] .c-bar .mic {
+      color: var(--text2)
+    }
+
+    :root[data-theme="light"] .c-bar #attachBtn:hover,
+    :root[data-theme="light"] .c-bar #approvalPill:hover,
+    :root[data-theme="light"] .c-bar #modelPill:hover,
+    :root[data-theme="light"] .c-bar .mic:hover {
+      background: var(--composer-hover);
+      color: var(--text)
+    }
+
+    :root[data-theme="light"] .send:disabled {
+      background: var(--send-off-bg);
+      color: var(--send-off-fg)
+    }
+
+    :root[data-theme="light"] #browse,
+    :root[data-theme="light"] #browse.need {
+      background: #ffffff;
+      color: var(--text2);
+      box-shadow: inset 0 0 0 1px var(--line2), 0 1px 3px rgba(15, 23, 42, .05)
+    }
+
+    :root[data-theme="light"] #browse:hover {
+      background: #f8f9fb;
+      color: var(--text)
+    }
+
+    :root[data-theme="light"] .chatmenu,
+    :root[data-theme="light"] .fmenu .flyout,
+    :root[data-theme="light"] .selmenu,
+    :root[data-theme="light"] .slash-menu,
+    :root[data-theme="light"] #quotaPop,
+    :root[data-theme="light"] .find-bar {
+      background: #ffffff;
+      border-color: var(--line2);
+      box-shadow: 0 12px 32px rgba(15, 23, 42, .12), 0 2px 6px rgba(15, 23, 42, .06)
+    }
+
+    :root[data-theme="light"] .dialog,
+    :root[data-theme="light"] .tbl-dialog {
+      box-shadow: 0 24px 64px rgba(15, 23, 42, .18), 0 4px 12px rgba(15, 23, 42, .08)
+    }
+
+    :root[data-theme="light"] .ov-nums .minus {
+      color: #dc2626
     }

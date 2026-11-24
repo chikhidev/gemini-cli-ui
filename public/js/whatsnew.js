@@ -2,24 +2,27 @@
     // Shown once, the first time the page opens after an update (the id below is remembered in this browser).
     // To announce a new round of changes: change WHATS_NEW_ID and the list. Settings -> General -> What's new, or
     // /whatsnew, shows it again.
-    const WHATS_NEW_ID = '2026-11-ui-refactor';
+    const WHATS_NEW_ID = '2026-11-ui-refactor-2';
     const WHATS_NEW = [
       {title: 'A new look', items: [
-        ['Redesigned interface', 'Floating message box, rounded controls, a darker theme and a soft glass edge on cards and buttons.'],
+        ['Redesigned interface', 'Floating message box with a visible outer shell and the git branch tucked in the bottom rim below the input box.'],
+        ['Refactored light theme', 'Clean white chat canvas on a soft cool-stone frame, recessed composer tray, crisp borders and legible toolbar controls.'],
+        ['Sidebar, pinning and filters', 'Pin folders and conversations to the top. Group by project or none, sort conversations and projects, and filter from the menu below New Conversation.'],
+        ['Top-right Overview menu', 'Switch between Review (with live +added and -removed counts) and Files in place from the top-right Overview button.'],
         ['Google Sans Flex', 'The default font now ships with the app, and every icon is drawn in-house.'],
-        ['Sidebar and search', 'The sidebar button sits top left. Search chats by name with Ctrl+K, with the import button beside it.'],
         ['Settings as a dialog', 'General, Appearance, Security and Usage pages, each with its own icon.'],
         ['Code colours', 'Atom One is the default code theme, and Robot Framework files are highlighted and get their own icon.'],
       ]},
       {title: 'In the chat', items: [
-        ['Find in conversation', 'Ctrl+F, the button beside search, or /find. Matches are highlighted and you can step through them.'],
+        ['Find in conversation', 'Ctrl+F, the button beside Overview, or /find. Matches are highlighted and you can step through them.'],
         ['Markdown in your message', 'Lists, headings, quotes, italics and strikethrough render in what you send, and are coloured while you type.'],
         ['Links and files at a glance', 'Jira, Confluence and whiteboard links, and files and folders (even in nested folders), show as an icon with the name.'],
         ['Review-style changes', 'Edited files appear as a tidy card with a Review button. Gemini\'s own notes (memory, scratch, restore) stay out of the way until you open them.'],
         ['Clearer progress', '"Calling Gemini CLI" while a message is sent, a red stop button that shows a spinner while stopping, and rounded suggested replies.'],
         ['New chats start empty', 'No default folder: pick one with the folder pill above the message box. The folder-access popup is gone.'],
       ]},
-      {title: 'Usage', items: [
+      {title: 'Models & Usage', items: [
+        ['Live model list', 'Models and auto-routing aliases are read from your quota and the installed Gemini CLI — nothing is hardcoded.'],
         ['Usage page', 'Click the quota ring (or open Settings) to see each model\'s daily usage as a progress ring, grouped by tier. Green while plenty is left, orange then red as it runs out.'],
       ]},
       {title: 'Security', items: [

@@ -744,16 +744,18 @@ async function accessToken() {
 let cliModels = null;
 function scanCli() {
   if (cliModels) return cliModels;
-  const auto = new Set(), gemma = new Set();
+  const auto = new Set(), gemma = new Set(), gemini = new Set();
   try {
     const bundle = path.dirname(GEMINI_PRE[0] || '');
     for (const f of fs.readdirSync(bundle).filter((n) => n.endsWith('.js'))) {
       const text = fs.readFileSync(path.join(bundle, f), 'utf8');
       for (const m of text.matchAll(/"(auto-gemini-\d+(?:\.\d+)?)"/g)) auto.add(m[1]);
       for (const m of text.matchAll(/var GEMMA_\w+_MODEL = "(gemma-[\w.-]+)"/g)) gemma.add(m[1]);
+      // the Gemini models the CLI itself names (its *_MODEL constants): used when quota cannot be read
+      for (const m of text.matchAll(/var \w*GEMINI\w*_MODEL\w* = "(gemini-\d+(?:\.\d+)?-[a-z][\w.-]*)"/g)) gemini.add(m[1]);
     }
   } catch {}
-  cliModels = { auto: [...auto], gemma: [...gemma] };
+  cliModels = { auto: [...auto], gemma: [...gemma], gemini: [...gemini] };
   return cliModels;
 }
 const cliAutoAliases = () => scanCli().auto;
@@ -773,8 +775,11 @@ async function models(force) {
   if (!force && modelsCache && Date.now() - modelsCache.at < 10 * 60 * 1000) return modelsCache.data;
   let ids = [];
   try { ids = ((await quota(force)).models || []).map((m) => m.model); } catch {}
-  const data = { models: ids.length ? pickerModels([...new Set(ids)]) : [], auto: cliAutoAliases(), source: ids.length ? 'quota' : 'none' };
-  if (ids.length) modelsCache = { at: Date.now(), data };   // only cache a good answer
+  // no quota (not signed in, no project): fall back to the models the installed CLI knows
+  const source = ids.length ? 'quota' : scanCli().gemini.length ? 'cli' : 'none';
+  if (!ids.length) ids = scanCli().gemini;
+  const data = { models: ids.length ? pickerModels([...new Set(ids)]) : [], auto: cliAutoAliases(), source };
+  if (source === 'quota') modelsCache = { at: Date.now(), data };   // only cache a good answer
   return data;
 }
 
