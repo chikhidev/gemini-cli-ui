@@ -6390,7 +6390,110 @@
     .fv-head {
       height: 36px;
       padding: 0 6px 0 14px;
-      border-bottom: 0
+      border-bottom: 1px solid var(--line)
+    }
+
+    .fv-head .icon-btn,
+    .dp-head .icon-btn {
+      color: var(--text2)
+    }
+
+    .fv-head .icon-btn:hover,
+    .dp-head .icon-btn:hover {
+      color: var(--text);
+      background: var(--hover)
+    }
+
+    .fv-head .fv-toggle {
+      color: var(--text2);
+      border-color: var(--line2);
+      background: color-mix(in srgb, var(--surface2) 55%, transparent)
+    }
+
+    .fv-head .fv-toggle:hover,
+    .fv-head .fv-toggle.on {
+      color: var(--text);
+      background: var(--hover);
+      border-color: var(--muted)
+    }
+
+    .fv-crumbs .cur {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px
+    }
+
+    .fv-body.nowrap pre.fcode .l .n {
+      background: var(--bg)
+    }
+
+    .fv-body pre.fcode .l {
+      transition: background .08s
+    }
+
+    .fv-body pre.fcode .l:hover {
+      background: color-mix(in srgb, var(--hover) 75%, transparent)
+    }
+
+    .fv-body.nowrap pre.fcode .l:hover .n {
+      background: color-mix(in srgb, var(--hover) 75%, var(--bg))
+    }
+
+    .fv-body pre.fcode .l:hover .n {
+      color: var(--text2);
+      opacity: 1
+    }
+
+    .fv-body pre.fcode .l.cur,
+    .fv-body.nowrap pre.fcode .l.cur .n {
+      background: var(--hover)
+    }
+
+    /* VS Code-style git gutter markers next to line numbers: green = added, blue = modified, red = deleted */
+    .fv-body pre.fcode .l .n {
+      position: relative
+    }
+
+    .fv-body.nowrap pre.fcode .l .n {
+      position: sticky;
+      left: 0;
+      z-index: 1
+    }
+
+    .fv-body pre.fcode .l.git-add .n::after,
+    .fv-body pre.fcode .l.git-mod .n::after {
+      content: "";
+      position: absolute;
+      top: 1px;
+      bottom: 1px;
+      right: 5px;
+      width: 3.5px;
+      border-radius: 1.5px
+    }
+
+    .fv-body pre.fcode .l.git-add .n::after {
+      background: var(--ok, #34c77b)
+    }
+
+    .fv-body pre.fcode .l.git-mod .n::after {
+      background: repeating-linear-gradient(-55deg, #28a9ff 0 2px, rgba(40, 169, 255, .3) 2px 4px)
+    }
+
+    :root[data-theme="light"] .fv-body pre.fcode .l.git-mod .n::after {
+      background: repeating-linear-gradient(-55deg, #0969da 0 2px, rgba(9, 105, 218, .28) 2px 4px)
+    }
+
+    .fv-body pre.fcode .l.git-del .n::before {
+      content: "";
+      position: absolute;
+      right: 3px;
+      bottom: -3px;
+      width: 0;
+      height: 0;
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      border-left: 6px solid #ff5f6d;
+      z-index: 2
     }
 
     .fv-head .fv-crumbs {

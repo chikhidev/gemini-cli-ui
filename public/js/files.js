@@ -642,6 +642,7 @@
         const tag = r.querySelector('.ftag');
         if (tag) tag.textContent = s ? (STATUS_LETTER[s] || '') : '';
       });
+      if (viewing && viewing.mode === 'source') markFileGutter();
     }
 
     // ---- open files as tabs ----
@@ -674,7 +675,7 @@
       if (viewing.rel !== viewing.path) parts.unshift(baseName(viewing.cwd || '') || 'Project');
       else if (parts.length > 4) parts = ['…', ...parts.slice(-3)];
       bar.innerHTML = parts.map((x, i) => i === parts.length - 1
-        ? `<span class="cur">${esc(x)}</span>` : `<span>${esc(x)}</span><i class="sep">›</i>`).join('');
+        ? `<span class="cur">${fileIcon(x)}${esc(x)}</span>` : `<span>${esc(x)}</span><i class="sep">›</i>`).join('');
       bar.title = viewing.path;
       bar.hidden = false;
     }
@@ -981,6 +982,7 @@
       fitFilesLayout();
       $('fvEmpty').hidden = true; $('fvHead').hidden = false; $('fvBody').hidden = false;
       $('fvMode').hidden = true; $('fvWrap').hidden = true;
+      wrapLines = false;
       clearFind();
       const body = $('fvBody');
       body.scrollTop = 0;
@@ -1018,7 +1020,7 @@
       const b = $('fvBody').querySelector('button');
       if (b) b.onclick = () => openWith(viewing.path, viewing.cwd, 'default');
     }
-    let wrapLines = store.get('gui.fvWrap', true);
+    let wrapLines = false;
     function renderFileBody(mode, line) {
       const body = $('fvBody'), text = viewing.text;
       viewing.mode = mode;
@@ -1045,6 +1047,85 @@
         `<span class="l${line === i + 1 ? ' hit' : ''}"><span class="n">${i + 1}</span><span class="c">${l || ' '}</span></span>`).join('') + '</pre>';
       if (line) body.querySelectorAll('.l')[line - 1]?.scrollIntoView({block: 'center'});
       refreshFind();
+      markFileGutter();
+    }
+
+    // VS Code-style git gutter markers on the left of each changed line in the file viewer:
+    // green (git-add) = added line, blue (git-mod) = modified line, red (git-del) = deleted line(s).
+    function parseGutterDiff(diffText) {
+      const map = new Map();
+      if (!diffText || !diffText.trim()) return map;
+      const touch = (no) => { if (!map.has(no)) map.set(no, {add: false, mod: false, del: false, delCount: 0}); return map.get(no); };
+      const lines = diffText.split('\n');
+      if (!lines.some(l => l.startsWith('@@ ')) && lines.some(l => l.startsWith('+++ '))) {
+        let no = 1, started = false;
+        lines.forEach(l => {
+          if (l.startsWith('+++ ')) { started = true; return; }
+          if (!started || l.startsWith('\\')) return;
+          if (l[0] === '+') touch(no++).add = true;
+        });
+        return map;
+      }
+      let newNo = 1, inHunk = false, dels = 0, adds = [];
+      const flush = () => {
+        if (!dels && !adds.length) return;
+        if (!dels) {
+          adds.forEach(n => { touch(n).add = true; });
+        } else if (!adds.length) {
+          const at = Math.max(1, newNo - 1);
+          const g = touch(at); g.del = true; g.delCount += dels;
+        } else {
+          const modN = Math.min(dels, adds.length);
+          for (let i = 0; i < modN; i++) touch(adds[i]).mod = true;
+          for (let i = modN; i < adds.length; i++) touch(adds[i]).add = true;
+          if (dels > adds.length) {
+            const g = touch(adds[adds.length - 1]); g.del = true; g.delCount += (dels - adds.length);
+          }
+        }
+        dels = 0; adds = [];
+      };
+      lines.forEach(line => {
+        const h = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+        if (h) { flush(); newNo = +h[2]; inHunk = true; return; }
+        if (!inHunk || line.startsWith('\\') || line === '') return;
+        if (line[0] === '-') dels++;
+        else if (line[0] === '+') adds.push(newNo++);
+        else { flush(); newNo++; }
+      });
+      flush();
+      return map;
+    }
+    async function markFileGutter() {
+      const v = viewing;
+      if (!v || v.mode !== 'source') return;
+      const code = $('fvBody')?.querySelector('pre.fcode');
+      if (!code) return;
+      const rel = String(v.rel || '').replace(/\\/g, '/').replace(/\/$/, '');
+      if (!rel || isAbs(rel) || rel.startsWith('..')) return;
+      let diffText = '';
+      try {
+        const d = await (await fetch(`/api/diff?cwd=${encodeURIComponent(v.cwd)}&path=${encodeURIComponent(rel)}`)).json();
+        diffText = d && !d.error ? (d.diff || '') : '';
+      } catch { return; }
+      if (viewing !== v || v.mode !== 'source') return;
+      const map = parseGutterDiff(diffText);
+      code.querySelectorAll('.l').forEach((row, i) => {
+        const g = map.get(i + 1);
+        row.classList.toggle('git-add', !!g?.add);
+        row.classList.toggle('git-mod', !!g?.mod);
+        row.classList.toggle('git-del', !!g?.del);
+        const n = row.querySelector('.n');
+        if (!n) return;
+        if (g) {
+          const parts = [];
+          if (g.mod) parts.push('Modified line (blue)');
+          if (g.add) parts.push('Added line (green)');
+          if (g.del) parts.push(`${g.delCount} deleted line${g.delCount > 1 ? 's' : ''} (red)`);
+          n.title = parts.join(' · ');
+        } else {
+          n.removeAttribute('title');
+        }
+      });
     }
     // click a line to mark it as the current line
     $('fvBody').addEventListener('click', (e) => {

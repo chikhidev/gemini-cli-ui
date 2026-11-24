@@ -2,13 +2,14 @@
     // Shown once, the first time the page opens after an update (the id below is remembered in this browser).
     // To announce a new round of changes: change WHATS_NEW_ID and the list. Settings -> General -> What's new, or
     // /whatsnew, shows it again.
-    const WHATS_NEW_ID = '2026-11-ui-refactor-2';
+    const WHATS_NEW_ID = '2026-11-ui-refactor-3';
     const WHATS_NEW = [
       {title: 'A new look', items: [
         ['Redesigned interface', 'Floating message box with a visible outer shell and the git branch tucked in the bottom rim below the input box.'],
         ['Refactored light theme', 'Clean white chat canvas on a soft cool-stone frame, recessed composer tray, crisp borders and legible toolbar controls.'],
         ['Sidebar, pinning and filters', 'Pin folders and conversations to the top. Group by project or none, sort conversations and projects, and filter from the menu below New Conversation.'],
         ['Top-right Overview menu', 'Switch between Review (with live +added and -removed counts) and Files in place from the top-right Overview button.'],
+        ['File viewer & git gutter', 'Files open no-wrap by default with interactive line hover, a divider below the breadcrumb path, clearer action buttons, and VS Code-style gutter markers (green = added, blue = modified, red = deleted).'],
         ['Google Sans Flex', 'The default font now ships with the app, and every icon is drawn in-house.'],
         ['Settings as a dialog', 'General, Appearance, Security and Usage pages, each with its own icon.'],
         ['Code colours', 'Atom One is the default code theme, and Robot Framework files are highlighted and get their own icon.'],
