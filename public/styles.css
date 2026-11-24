@@ -7703,6 +7703,7 @@
       max-width: var(--chat-w);
       margin: 0 auto;
       padding: 5px;
+      border: 1px solid color-mix(in srgb, var(--composer-line) 40%, transparent);
       border-radius: 23px;
       background: color-mix(in srgb, var(--composer-bg) 42%, var(--bg));
       /* box-shadow: var(--glass-strong), 0 10px 18px rgba(0, 0, 0, .3) */
