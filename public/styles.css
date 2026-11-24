@@ -7696,15 +7696,66 @@
       box-shadow: var(--glass), 0 6px 18px rgba(0, 0, 0, .3)
     }
 
-    /* the message box: the strongest light, a faint ring and the drop shadow under it */
+    /* the message box: an outer parent shell around the inner child box, with the git branch strip in the bottom space between them */
+    .composer-shell {
+      max-width: var(--chat-w);
+      margin: 0 auto;
+      padding: 5px;
+      border-radius: 23px;
+      background: rgba(255, 255, 255, .025);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .04), 0 10px 18px rgba(0, 0, 0, .3)
+    }
+
+    :root[data-theme="light"] .composer-shell {
+      background: rgba(0, 0, 0, .025);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .05), 0 8px 18px rgba(0, 0, 0, .06)
+    }
+
     .composer,
     .composer:focus-within {
-      box-shadow: 0 0 0 5px rgba(255, 255, 255, .025), var(--glass-strong), 0 10px 18px rgba(0, 0, 0, .3)
+      box-shadow: var(--glass-strong)
     }
 
     :root[data-theme="light"] .composer,
     :root[data-theme="light"] .composer:focus-within {
-      box-shadow: 0 0 0 5px rgba(0, 0, 0, .025), var(--glass-strong), 0 8px 18px rgba(0, 0, 0, .06)
+      box-shadow: var(--glass-strong)
+    }
+
+    .composer-foot {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px 1px
+    }
+
+    .composer-foot:not(:has(:not([hidden]))) {
+      display: none
+    }
+
+    .composer-foot #branchPill {
+      height: 24px;
+      padding: 0 7px;
+      gap: 5px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 270;
+      color: var(--muted)
+    }
+
+    .composer-foot #branchPill:hover {
+      background: var(--composer-hover);
+      color: var(--text)
+    }
+
+    .composer-foot #branchPill svg {
+      width: 13px;
+      height: 13px
+    }
+
+    .composer-foot #branchPill .v {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis
     }
 
     /* surfaces whose children paint over their top edge (the file panel, the settings sidebar) get the same
@@ -8179,6 +8230,7 @@
       flex-direction: column
     }
 
+    main.fresh .composer-wrap > .composer-shell,
     main.fresh .composer-wrap > .composer,
     main.fresh .composer-wrap > .pills {
       width: 100%

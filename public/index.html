@@ -101,15 +101,6 @@
       </div>
       <div class="top-right">
         <button class="icon-btn" id="findBtn" title="Find in conversation (Ctrl+F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h9M4 10.5h5M4 15h4"/><circle cx="15.5" cy="14" r="4"/><path d="m18.5 17 2.5 2.5"/></svg></button>
-        <button class="pill ghost-pill" id="branchPill" title="Git Branch" hidden>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="7" cy="6" r="2.5" />
-            <circle cx="7" cy="18" r="2.5" />
-            <circle cx="17" cy="9" r="2.5" />
-            <path d="M7 8.5v7M17 11.5c0 3-3 4-7.5 5.5" />
-          </svg>
-          <span class="v" id="branchLabel"></span>
-        </button>
       <button class="icon-btn" id="filesBtn" title="Browse the folder's files">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l2 2.5h8.8A1.5 1.5 0 0 1 21 10v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z" /></svg>
       </button>
@@ -155,55 +146,68 @@
         <span class="v" id="ctxLabel"></span>
       </button>
       </div>
-      <div class="composer">
-        <div class="in-wrap"><div class="in-mirror" id="inMirror" aria-hidden="true"></div><textarea id="input" rows="1" placeholder="Ask anything, / for actions"></textarea></div>
-        <div class="c-bar">
-        <button class="clip" id="attachBtn" title="Attach files for Gemini to read">
-          <svg viewBox="0 0 24 24">
-            <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5v14M5 12h14" />
-          </svg>
-        </button>
-                <label class="pill" id="approvalPill" data-tip="Approval mode  ·  Shift+Tab">
-          <svg viewBox="0 0 24 24" id="approvalIcon"></svg>
-          <span class="v" id="approvalLabel"></span>
-          <select id="approval">
-            <option value="yolo">Auto-approve</option>
-            <option value="auto_edit">Auto-edit</option>
-            <option value="plan">Plan</option>
-          </select>
-        </label>
-        <span class="c-gap"></span>
-        <label class="pill ghost-pill" id="modelPill" data-tip="Select model">
-          <span class="v" id="modelLabel"></span>
-          <select id="model">
-            <!-- Fallback only: replaced by the live list from /api/models (your quota + the CLI's auto aliases). -->
-            <option value="">Auto (CLI default)</option>
-            <optgroup label="Auto routing">
-              <option value="auto-gemini-3">Auto · Gemini 3</option>
-              <option value="auto-gemini-2.5">Auto · Gemini 2.5</option>
-            </optgroup>
-            <optgroup label="Models">
-              <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (preview)</option>
-              <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
-              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-              <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
-              <option value="gemma-4-31b-it">Gemma 4 31B IT</option>
-              <option value="gemma-4-26b-a4b-it">Gemma 4 26B A4B IT</option>
-            </optgroup>
-          </select>
-        </label>
-      
-        <button class="quota-ring" id="quotaPill" title="Daily model quota" hidden>
-          <svg viewBox="0 0 36 36">
-            <circle class="track" cx="18" cy="18" r="15.5" fill="none" stroke-width="3.6" />
-            <circle class="fill" id="quotaArc" cx="18" cy="18" r="15.5" fill="none" stroke-width="3.6"
-              stroke-linecap="round" transform="rotate(-90 18 18)" />
-          </svg>
-        </button>
-        <button class="clip mic" id="micBtn" title="Voice input: speak to type (click again to stop)" hidden>
-          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 3a3 3 0 0 0-3 3v5.5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M6.5 11a5.5 5.5 0 0 0 11 0M12 16.5V20M9 20h6"/></svg>
-        </button>
-        <button class="send" id="send" disabled title="Send"></button>
+      <div class="composer-shell">
+        <div class="composer">
+          <div class="in-wrap"><div class="in-mirror" id="inMirror" aria-hidden="true"></div><textarea id="input" rows="1" placeholder="Ask anything, / for actions"></textarea></div>
+          <div class="c-bar">
+          <button class="clip" id="attachBtn" title="Attach files for Gemini to read">
+            <svg viewBox="0 0 24 24">
+              <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
+                  <label class="pill" id="approvalPill" data-tip="Approval mode  ·  Shift+Tab">
+            <svg viewBox="0 0 24 24" id="approvalIcon"></svg>
+            <span class="v" id="approvalLabel"></span>
+            <select id="approval">
+              <option value="yolo">Auto-approve</option>
+              <option value="auto_edit">Auto-edit</option>
+              <option value="plan">Plan</option>
+            </select>
+          </label>
+          <span class="c-gap"></span>
+          <label class="pill ghost-pill" id="modelPill" data-tip="Select model">
+            <span class="v" id="modelLabel"></span>
+            <select id="model">
+              <!-- Fallback only: replaced by the live list from /api/models (your quota + the CLI's auto aliases). -->
+              <option value="">Auto (CLI default)</option>
+              <optgroup label="Auto routing">
+                <option value="auto-gemini-3">Auto · Gemini 3</option>
+                <option value="auto-gemini-2.5">Auto · Gemini 2.5</option>
+              </optgroup>
+              <optgroup label="Models">
+                <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (preview)</option>
+                <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
+                <option value="gemma-4-31b-it">Gemma 4 31B IT</option>
+                <option value="gemma-4-26b-a4b-it">Gemma 4 26B A4B IT</option>
+              </optgroup>
+            </select>
+          </label>
+        
+          <button class="quota-ring" id="quotaPill" title="Daily model quota" hidden>
+            <svg viewBox="0 0 36 36">
+              <circle class="track" cx="18" cy="18" r="15.5" fill="none" stroke-width="3.6" />
+              <circle class="fill" id="quotaArc" cx="18" cy="18" r="15.5" fill="none" stroke-width="3.6"
+                stroke-linecap="round" transform="rotate(-90 18 18)" />
+            </svg>
+          </button>
+          <button class="clip mic" id="micBtn" title="Voice input: speak to type (click again to stop)" hidden>
+            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 3a3 3 0 0 0-3 3v5.5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M6.5 11a5.5 5.5 0 0 0 11 0M12 16.5V20M9 20h6"/></svg>
+          </button>
+          <button class="send" id="send" disabled title="Send"></button>
+          </div>
+        </div>
+        <div class="composer-foot">
+          <button class="pill ghost-pill" id="branchPill" title="Git Branch" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="7" cy="6" r="2.5" />
+              <circle cx="7" cy="18" r="2.5" />
+              <circle cx="17" cy="9" r="2.5" />
+              <path d="M7 8.5v7M17 11.5c0 3-3 4-7.5 5.5" />
+            </svg>
+            <span class="v" id="branchLabel"></span>
+          </button>
         </div>
       </div>
       <div id="quotaPop">
