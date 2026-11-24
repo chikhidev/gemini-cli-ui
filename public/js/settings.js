@@ -184,16 +184,10 @@
     function renderSessions() {
       $('sessions').innerHTML = '';
       const view = sideView();
-      // One-shot runs started by other tools (e.g. Aurelia) are hidden unless the toggle is on.
+      // One-shot runs started by other tools (e.g. Aurelia) are hidden unless turned on in the filter menu.
       const showAuto = store.get('gui.showAuto', false);
-      const autoCount = sessions.filter(s => s.automated).length;
-      const toggle = $('autoToggle');
-      toggle.hidden = !autoCount;
-      toggle.textContent = showAuto ? `Hide ${autoCount} automated` : `${autoCount} automated hidden`;
-      toggle.title = 'Single-prompt Gemini runs started by other tools (not from this app)';
-      toggle.onclick = () => { store.set('gui.showAuto', !showAuto); renderSessions(); };
       $('sideLabel').textContent = view.group === 'none' ? 'Conversations' : 'Projects';
-      $('sideViewBtn').classList.toggle('on', view.pinnedOnly || view.group !== 'project' || view.sortChats !== 'updated' || view.sortProjects !== 'updated');
+      $('sideViewBtn').classList.toggle('on', view.pinnedOnly || showAuto || view.group !== 'project' || view.sortChats !== 'updated' || view.sortProjects !== 'updated');
       const q = searchQuery.trim().toLowerCase();
       const pins = pinnedChats();
       // While searching, every chat is eligible (including automated ones): match on title, or on
@@ -398,7 +392,7 @@
         else if (k) setSideView({[k]: b.dataset.v});
         else if (a === 'collapse') { store.set('gui.collapsedGroups', [...new Set(sessions.map(s => s.cwd))]); renderSessions(); }
         else if (a === 'expand') { store.set('gui.collapsedGroups', []); renderSessions(); }
-        else if (a === 'reset') { store.set('gui.sideView', {}); renderSessions(); }
+        else if (a === 'reset') { store.set('gui.sideView', {}); store.set('gui.showAuto', false); renderSessions(); }
         openSideMenu();                                  // stay open, showing the new state
       };
       sideMenu.classList.add('open'); $('sideViewBtn').classList.add('open');
