@@ -661,12 +661,15 @@
       const node = document.createElement('div');
       node.className = 'tool step';
       const mcp = mcpParts(p.name);
-      const desc = p.params?.description || (mcp ? prettyAction(mcp.action) : '');
+      const title = mcp ? prettyServer(mcp.server) + ' · ' + prettyAction(mcp.action) : stepPhrase(p);
+      const stepDesc = typeof p.params?.description === 'string' ? p.params.description.trim() : '';
+      const hasMore = stepDesc && stepDesc.toLowerCase() !== title.toLowerCase();
       const icon = stepIcon(p.name);
       node.innerHTML = `<div class="rail"><span class="ico${icon === 'gemini' ? ' gem' : ''}" title="${esc(toolLabel(p.name))}">${lineIcon(icon)}</span><span class="line"></span></div>
         <div class="main">
-          <div class="head" title="Click to show details"><span class="desc" title="${esc(shortArg(p.params))}">${esc(desc || stepPhrase(p))}</span>
+          <div class="head" title="Click to show details"><span class="desc" title="${esc(shortArg(p.params))}">${esc(title)}</span>
             <span class="dur"></span></div>
+          ${hasMore ? `<div class="more">${esc(stepDesc)}</div>` : ''}
           <div class="tool-body"></div>
         </div>`;
       node._started = Date.now();
@@ -935,6 +938,12 @@
       // Steps stay open while they run; once text follows them (or the turn ends) they fold into one row.
       foldToolGroups() {
         const m = this.m;
+        // Only the currently active step shows its description text (.more); as soon as the next step starts
+        // (or the reply text begins), earlier steps hide their description and collapse to one line.
+        const lastPart = m.pending ? [...m.parts].reverse().find(p => !(p.kind === 'tool' && p.name === 'exit_plan_mode')) : null;
+        const curStepNode = lastPart && (lastPart.kind === 'tool' || lastPart.kind === 'thought') ? this.nodes.get(lastPart) : null;
+        this.body.querySelectorAll('.step.cur-step').forEach(el => { if (el !== curStepNode) el.classList.remove('cur-step'); });
+        if (curStepNode) curStepNode.classList.add('cur-step');
         this.body.querySelectorAll('.tools').forEach(group => {
           const inGroup = m.parts.filter(p => (p.kind === 'tool' || p.kind === 'thought') && this.nodes.get(p)?.parentElement === group);
           const parts = inGroup.filter(p => p.kind === 'tool');

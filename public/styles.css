@@ -2137,7 +2137,7 @@
       color: var(--text)
     }
 
-    .step.thought .more {
+    .step .more {
       display: none;
       padding-top: 2px;
       font-size: 13px;
@@ -2145,10 +2145,12 @@
       color: var(--muted)
     }
 
+    .step.cur-step .more,
     .step.thought.full .more {
       display: block
     }
 
+    .step.cur-step.thought .d .s,
     .step.thought.full .d .s {
       white-space: normal
     }
