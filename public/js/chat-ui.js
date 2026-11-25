@@ -51,7 +51,7 @@
       input.focus(); input.setSelectionRange(0, input.value.length, 'backward');   // all selected, start of the name in view
     }
     async function deleteChat(s, row) {
-      if (busy || !confirm(`Delete "${s.title}"?\n\nThis removes the Gemini CLI session file from disk.`)) return;
+      if (isRunning(s.id) || !confirm(`Delete "${s.title}"?\n\nThis removes the Gemini CLI session file from disk.`)) return;
       row.style.transition = 'all .25s'; row.style.opacity = 0; row.style.transform = 'translateX(-10px)';
       await fetch('/api/history?id=' + encodeURIComponent(s.id), {method: 'DELETE'});
       if (current?.id === s.id) newChat();
@@ -99,7 +99,7 @@
     window.addEventListener('resize', closeChatMenu);
 
     function newChat() {
-      if (busy) return;
+      detachRun();
       setNextPrompt(null);
       pendingSessionFile = null; renderImportChip(); $('input').placeholder = 'Ask anything, / for actions';
       setUrlSession(null);
@@ -115,7 +115,38 @@
       history.replaceState(null, '', u);
     }
     const LOADING_MIN_MS = 900;
+    // ---- several chats at once ----
+    // Gemini keeps writing a reply on the server when you leave its chat: the page only stops listening. Opening
+    // another chat (or a new one) therefore never interrupts it; coming back to the chat picks the reply up again
+    // from where it is (see liveRun / send(null, live)), and the sidebar shows a dot on every chat being worked on.
+    let runningChats = new Set();
+    const isRunning = (id) => !!id && ((busy && current?.id === id) || runningChats.has(id));
+    function detachRun() {
+      if (!busy) return;
+      if (current?.id) runningChats.add(current.id);
+      if (controller) { controller.detached = true; controller.abort(); }      // stop listening (not /api/stop)
+      runId = null; controller = null;
+      setBusy(false);
+      setTimeout(() => { loadSessions(); refreshRuns(); }, 900);
+    }
+    async function refreshRuns() {
+      let list;
+      try { list = await (await fetch('/api/runs')).json(); } catch { return; }
+      if (!Array.isArray(list)) return;
+      const now = new Set(list.filter(r => !r.done && r.sessionId).map(r => r.sessionId));
+      const finished = [...runningChats].filter(id => !now.has(id) && !(busy && current?.id === id));
+      const changed = finished.length || [...now].some(id => !runningChats.has(id));
+      runningChats = new Set([...now].filter(id => true));
+      finished.forEach(id => {
+        const s = sessions.find(x => x.id === id);
+        if (s && current?.id !== id) toast(`"${s.title.slice(0, 50)}" finished`);
+      });
+      if (changed) { renderSessions(); if (finished.length) loadSessions(); }
+    }
+    setInterval(() => { if (document.visibilityState === 'visible') refreshRuns(); }, 4000);
     async function openSession(s) {
+      if (busy && current?.id === s.id) return;          // it is the chat on screen
+      detachRun();
       setNextPrompt(null);
       current = {id: s.id, title: s.title, cwd: s.cwd};
       updateHeader();

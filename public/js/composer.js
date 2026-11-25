@@ -238,7 +238,7 @@
           : pct >= 50 ? 'Past half: Gemini starts compressing older messages, which can lose detail.'
             : 'Gemini re-sends the whole conversation on each call, so this grows as the chat gets longer.');
     }
-    $('ctxPill').onclick = () => { if (!busy) newChat(); };
+    $('ctxPill').onclick = () => newChat();
     // Hovering a chat shows how full its context window is (fetched once per chat).
     const ctxBySession = new Map();
     async function describeSession(s, el) {

@@ -260,14 +260,14 @@
       setBusy(true);
 
       const session = current, tools = {};
-      let raf = null;
-      const rerender = () => {if (!raf) raf = requestAnimationFrame(() => {raf = null; view.render(); scrollDown();});};
+      let raf = null, myCtl = null;     // myCtl.detached: you opened another chat; Gemini carries on, this page just stops listening
+      const rerender = () => {if (!raf) raf = requestAnimationFrame(() => {raf = null; if (myCtl?.detached) return; view.render(); scrollDown();});};
 
       // Refresh the changes panel while Gemini works, so edits appear as they are made.
       const watch = setInterval(() => loadChanges(true), 2000);
       runId = attach ? attach.runId : crypto.randomUUID();
       if (!attach && !session.id) store.set('gui.newRun', runId);  // a reload before the new chat has an id can still find it
-      controller = new AbortController();
+      myCtl = controller = new AbortController();
       try {
         const res = attach
           ? await fetch('/api/attach?runId=' + encodeURIComponent(runId), {signal: controller.signal})
@@ -288,6 +288,7 @@
           }
         }
       } catch (e) {
+        if (myCtl.detached) { clearInterval(watch); if (raf) cancelAnimationFrame(raf); return; }     // left this chat: nothing more to do here
         msg.parts.push({kind: 'err', text: e.name === 'AbortError' ? 'Stopped by you.' : e.message});
         if (msg.phase === 'sending' || msg.phase === 'starting') setDelivery(userEl, 'failed');
       }
@@ -315,6 +316,7 @@
       notifyFinished(session, msg);
 
       function handleEvent(ev) {
+        if (myCtl.detached) return;
         msg.lastEventAt = Date.now();
         if (msg.phase !== 'working') {
           // Gemini started (init) or already answers: the message has arrived

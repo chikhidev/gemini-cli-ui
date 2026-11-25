@@ -156,7 +156,7 @@
       [...palList.children].forEach((r, k) => r.classList.toggle('hi', k === i));
       if (scroll) palList.children[i]?.scrollIntoView({block: 'nearest'});
     }
-    function palOpen(i) { const s = palItems[i]; if (!s) return; closePalette(); if (!busy) openSession(s); }
+    function palOpen(i) { const s = palItems[i]; if (!s) return; closePalette(); openSession(s); }
     function openPalette() { pal.hidden = false; palInput.value = ''; palIdx = 0; palRender(); palInput.focus(); }
     function closePalette() { pal.hidden = true; }
     $('searchBtn').onclick = openPalette;
@@ -218,10 +218,10 @@
         const hit = q ? searchHits.get(s.id) : null;
         const hl = (t) => highlightText(t, q);
         el.innerHTML = (pinned ? `<span class="pin-mark" title="Pinned">${ICON_PIN}</span>` : '')
-          + `<div class="t">${q ? hl(s.title) : titleHtml(s.title)}</div>${hit && !s.title.toLowerCase().includes(q) ? `<div class="snip">${hl(hit)}</div>` : ''}<span class="when">${s.draft ? '' : ago(s.updated)}</span>${s.draft ? '' : '<button class="more" title="More"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg></button>'}`;
+          + `<div class="t">${q ? hl(s.title) : titleHtml(s.title)}</div>${hit && !s.title.toLowerCase().includes(q) ? `<div class="snip">${hl(hit)}</div>` : ''}${!s.draft && isRunning(s.id) ? '<span class="run-dot" title="Gemini is working in this chat"></span>' : ''}<span class="when">${s.draft ? '' : ago(s.updated)}</span>${s.draft ? '' : '<button class="more" title="More"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg></button>'}`;
         el.title = view.group === 'none' && s.cwd ? s.title + '\n' + s.cwd : s.title;
         el.addEventListener('mouseenter', () => describeSession(s, el), {once: true});
-        el.onclick = () => { if (!busy && !s.draft) openSession(s); closeSide(); };
+        el.onclick = () => { if (!s.draft) openSession(s); closeSide(); };
         el.querySelector('.more')?.addEventListener('click', (e) => {
           e.stopPropagation();
           openChatMenu(e.currentTarget, s, el);
@@ -306,7 +306,6 @@
         });
         g.querySelector('.g-add').onclick = (e) => {
           e.stopPropagation();
-          if (busy) return;
           newChat();
           $('cwd').value = cwd; saveSettings();
         };
@@ -342,7 +341,6 @@
       chatMenu.querySelector('[data-a=pin]').onclick = (e) => { e.stopPropagation(); closeChatMenu(); togglePinFolder(cwd); };
       chatMenu.querySelector('[data-a=new]').onclick = (e) => {
         e.stopPropagation(); closeChatMenu();
-        if (busy) return;
         newChat(); $('cwd').value = cwd; saveSettings();
       };
       chatMenu.classList.add('open');
@@ -420,7 +418,7 @@
       chip.querySelector('button').onclick = () => { pendingSessionFile = null; renderImportChip(); };
       $('attachRow').prepend(chip);
     }
-    $('importSession').onclick = () => { if (!busy) $('importFile').click(); };
+    $('importSession').onclick = () => $('importFile').click();
     $('importFile').onchange = async () => {
       const file = $('importFile').files[0];
       $('importFile').value = '';

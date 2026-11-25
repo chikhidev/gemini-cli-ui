@@ -8935,6 +8935,29 @@
       letter-spacing: 0
     }
 
+    /* a dot on the chats Gemini is working in (you can leave a chat while it writes) */
+    .sess .run-dot {
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      margin-top: -3.5px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent);
+      animation: run-dot 1.6s ease-out infinite
+    }
+
+    @keyframes run-dot {
+      0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent) }
+      70%, 100% { box-shadow: 0 0 0 6px transparent }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .sess .run-dot { animation: none }
+    }
+
     /* tight window: the panel floats over the chat, so it keeps a shadow */
     @media (min-width:761px) and (max-width:1100px) {
       #diffPanel {
