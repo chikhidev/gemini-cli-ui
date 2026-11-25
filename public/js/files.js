@@ -634,11 +634,22 @@
       }
       const st = new Map(changedFiles.map(f => [f.path.replace(/\\/g, '/').replace(/\/$/, ''), f.status]));
       const dirs = new Set();
-      st.forEach((_, p) => { const parts = p.split('/'); for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join('/')); });
+      // a folder takes the colour of the most serious change inside it (like VS Code): conflict/deleted > modified > new
+      const rank = (s) => s === 'conflicted' || s === 'deleted' ? 3 : s === 'modified' ? 2 : 1;
+      const dirSt = new Map();
+      st.forEach((s, p) => {
+        const parts = p.split('/');
+        for (let i = 1; i < parts.length; i++) {
+          const d = parts.slice(0, i).join('/');
+          dirs.add(d);
+          if (!dirSt.has(d) || rank(s) > rank(dirSt.get(d))) dirSt.set(d, s);
+        }
+      });
       $('fileTree').querySelectorAll('.frow').forEach(r => {
         const s = st.get(r.dataset.rel);
         r.classList.toggle('changed', !!s || dirs.has(r.dataset.rel));
-        if (s && !r.dataset.fdir) r.dataset.git = s; else delete r.dataset.git;
+        if (r.dataset.fdir) { if (dirSt.has(r.dataset.rel)) r.dataset.git = dirSt.get(r.dataset.rel); else delete r.dataset.git; }
+        else if (s) r.dataset.git = s; else delete r.dataset.git;
         const tag = r.querySelector('.ftag');
         if (tag) tag.textContent = s ? (STATUS_LETTER[s] || '') : '';
       });
