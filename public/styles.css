@@ -1043,7 +1043,8 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 260px
+      max-width: 260px;
+      min-width: 0
     }
 
     .pill select {
@@ -5951,16 +5952,6 @@
       box-shadow: 0 0 0 2px var(--surface)
     }
 
-    .top-right #branchPill {
-      margin-right: 4px
-    }
-
-    .top-right #branchPill .v {
-      max-width: 150px;
-      overflow: hidden;
-      text-overflow: ellipsis
-    }
-
     header .header-title {
       flex: 1
     }
@@ -6466,11 +6457,10 @@
     .fv-body pre.fcode .l.git-mod .n::after {
       content: "";
       position: absolute;
-      top: 1px;
-      bottom: 1px;
+      top: -1px;                   /* a hair past the row on both sides so neighbouring rows join into one bar */
+      bottom: -1px;
       right: 5px;
-      width: 3.5px;
-      border-radius: 1.5px
+      width: 3.5px
     }
 
     .fv-body pre.fcode .l.git-add .n::after {
@@ -6682,7 +6672,7 @@
     }
 
     main:not(.fresh) .composer-wrap {
-      padding: 28px 16px 30px
+      padding: 28px 16px 20px
     }
 
     /* ---------- the sidebar button stays in one place (top-left), open or closed; no opening on hover ---------- */
@@ -7610,6 +7600,11 @@
       padding-top: 24px                /* the breadcrumb now sits above the card; 72px was the old header's room */
     }
 
+    /* the message dots live in the left margin (8px..24px): keep the text clear of them when the chat is narrow */
+    main:not(.fresh) #chat .inner {
+      padding-left: 40px
+    }
+
     .msg.ai {
       margin-bottom: 22px
     }
@@ -7841,10 +7836,12 @@
     }
 
     .composer-foot {
+      max-width: var(--chat-w);
+      margin: 4px auto 0;
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 4px 8px 1px
+      padding: 0 4px
     }
 
     .composer-foot:not(:has(:not([hidden]))) {
@@ -7858,7 +7855,8 @@
       border-radius: 999px;
       font-size: 12.5px;
       font-weight: 270;
-      color: var(--muted)
+      color: var(--muted);
+      min-width: 0
     }
 
     .composer-foot #branchPill:hover {
@@ -7874,7 +7872,8 @@
     .composer-foot #branchPill .v {
       max-width: 200px;
       overflow: hidden;
-      text-overflow: ellipsis
+      text-overflow: ellipsis;
+      min-width: 1.5em
     }
 
     /* surfaces whose children paint over their top edge (the file panel, the settings sidebar) get the same
@@ -8172,7 +8171,7 @@
       box-sizing: border-box;
       width: 100%;
       margin: 0;
-      padding: 2px 4px 4px 0;
+      padding: 10px 4px 10px 0;
       border: 0;
       font: inherit;
       font-size: 14px;
@@ -8180,7 +8179,8 @@
       letter-spacing: normal;
       white-space: pre-wrap;
       overflow-wrap: break-word;
-      word-break: normal
+      word-break: normal;
+      min-height: 44px
     }
 
     .in-mirror {
@@ -8350,6 +8350,7 @@
     }
 
     main.fresh .composer-wrap > .composer-shell,
+    main.fresh .composer-wrap > .composer-foot,
     main.fresh .composer-wrap > .composer,
     main.fresh .composer-wrap > .pills {
       width: 100%
@@ -9032,11 +9033,7 @@
         height: auto
       }
 
-      .top-right #branchPill {
-        display: none
-      }
-
-      #chat,
+        #chat,
       main:not(.fresh) .composer-wrap {
         border-radius: 0
       }
@@ -9110,6 +9107,10 @@
 
       .inner {
         padding: 20px 16px 40px
+      }
+
+      main:not(.fresh) #chat .inner {
+        padding-left: 16px
       }
 
       .composer-wrap {
