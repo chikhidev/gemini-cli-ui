@@ -9193,6 +9193,11 @@
         overflow: hidden
       }
 
+      /* the review list is its own scroller: scrolling still clips it to the corners */
+      body:has(#diffPanel.open):not(.panel-max) #diffPanel .diff-body {
+        overflow: auto
+      }
+
       body.panel-max #diffPanel {
         border-radius: 12px
       }
