@@ -576,6 +576,45 @@
     }
     const MODE_CYCLE = ['yolo', 'auto_edit', 'plan'];
     function cycleMode() { setMode(MODE_CYCLE[(MODE_CYCLE.indexOf($('approval').value) + 1) % MODE_CYCLE.length]); }
+    // Gemini often repeats the plan in its reply (as a code block or as plain markdown) on top of writing the file.
+    // The card already shows the file, so the repeated blocks are hidden; the rest of the reply stays.
+    function hidePlanCopies(card, planText) {
+      const norm = (s) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+      const plan = norm(planText);
+      // how many of these lines are long enough to compare, and how many of those are in the plan
+      const score = (lines) => {
+        const real = lines.map(norm).filter(l => l.length >= 8);
+        return {total: real.length, found: real.filter(l => plan.includes(l)).length};
+      };
+      const linesOf = (el) => {
+        if (!el.matches('ul, ol, table')) return [el.textContent];
+        return [...el.querySelectorAll('li, tr')].map(row => {
+          const own = row.cloneNode(true); own.querySelectorAll('ul, ol').forEach(x => x.remove());
+          return own.textContent;
+        });
+      };
+      card.closest('.msg.ai')?.querySelectorAll('.body > .md').forEach(md => {
+        const copies = [], prose = [];
+        [...md.children].forEach(el => {
+          const pre = el.matches('pre') ? el : el.querySelector('pre');
+          if (pre) {
+            const s = score((pre.querySelector('code') || pre).textContent.split('\n'));
+            if (s.total >= 4 && s.found >= s.total / 2) copies.push(el);
+            return;
+          }
+          const s = score(linesOf(el));
+          if (s.total && s.found >= s.total * .8) prose.push({el, found: s.found});
+        });
+        // a sentence or two quoted from the plan is normal text; a long stretch of it is a copy
+        if (prose.reduce((n, p) => n + p.found, 0) >= 5) copies.push(...prose.map(p => p.el));
+        copies.forEach(el => { el.hidden = true; });
+        // headings and rules that only introduced hidden blocks go too
+        if (copies.length) [...md.children].reverse().forEach(el => {
+          if (el.matches('h1, h2, h3, h4, h5, h6, hr') && (!el.nextElementSibling || el.nextElementSibling.hidden)) el.hidden = true;
+        });
+        md.hidden = [...md.children].length > 0 && [...md.children].every(el => el.hidden);
+      });
+    }
     function planCard(ref) {
       const el = document.createElement('div'); el.className = 'plan-card';
       el.innerHTML = `<div class="pc-head">
@@ -613,6 +652,7 @@
           if (d.error) { body.innerHTML = `<div class="fmsg">${esc(d.error)}. Gemini still has the plan in this chat, so you can approve it.</div>`; return; }
           body.innerHTML = renderMarkdown(d.text);
           highlight(body); enhanceTables(body); markLabels(body);
+          hidePlanCopies(el, d.text);
           if (d.path) q('.pc-name').title = d.path;
           requestAnimationFrame(() => { if (body.scrollHeight > body.clientHeight + 8) q('.pc-more').hidden = false; });
         });
