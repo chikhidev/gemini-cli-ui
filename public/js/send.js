@@ -95,6 +95,7 @@
       {name: 'theme', desc: 'Switch between dark and light', run: () => {
         const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
         store.set('gui.theme', t); applyTheme(t); syncThemeSeg();
+        applyGrad(); syncPrimaryColor(); syncCodeThemeSelect();
       }},
       {name: 'settings', desc: 'Open Settings', run: () => setTimeout(openSettings)},
     ];

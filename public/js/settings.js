@@ -7,7 +7,9 @@
       const o = document.createElement('option'); o.value = o.textContent = store.get('gui.model', '');
       $('model').append(o); $('model').value = o.value;
     }
-    if (!$('cwd').value) fetch('/api/info').then(r => r.json()).then(i => {$('cwd').value = i.cwd; saveSettings();});
+    // wait for every script: saveSettings() calls functions defined in the files loaded after this one
+    if (!$('cwd').value) document.addEventListener('DOMContentLoaded', () =>
+      fetch('/api/info').then(r => r.json()).then(i => {$('cwd').value = i.cwd; saveSettings();}));
     ['cwd', 'approval', 'model'].forEach(id => $(id).addEventListener('change', () => { saveSettings(); if (id === 'cwd') fetchAppInfo(); }));
     // mode pill icons: Auto-approve = check circle, Auto-edit = pencil, Plan = clipboard list
     const MODE_ICONS = {

@@ -1,35 +1,49 @@
     // ---------- theme ----------
-    // Code themes from highlight.js (cdnjs). The default ('') is Atom One, following the interface theme: Atom One Dark
-    // in dark mode, Atom One Light in light mode. 'auto' is the app's own palette (accent colour, no extra stylesheet).
+    // Code themes from highlight.js (bundled in /vendor). Settings only offers the ones made for the current mode, and
+    // each mode remembers its own choice, so a dark code theme never lands on a light page. The default ('') is
+    // Atom One: its dark version in dark mode, its light version in light mode. 'auto' is the app's own palette
+    // (accent colour, no extra stylesheet). The third value is the mode a theme belongs to (none: both).
     const CODE_THEMES = [
-      ['Atom One (match theme)', ''],
+      ['Atom One', ''],
       ['App colors (accent)', 'auto'],
-      ['GitHub Dark', 'github-dark'],
-      ['GitHub Light', 'github'],
-      ['Atom One Dark', 'atom-one-dark'],
-      ['Atom One Light', 'atom-one-light'],
-      ['Monokai', 'monokai'],
-      ['Dracula', 'base16/dracula'],
-      ['Nord', 'nord'],
-      ['Night Owl', 'night-owl'],
-      ['Tokyo Night Dark', 'tokyo-night-dark'],
-      ['Visual Studio 2015', 'vs2015'],
-      ['Visual Studio Light', 'vs'],
-      ['Solarized Dark', 'base16/solarized-dark'],
-      ['Solarized Light', 'base16/solarized-light'],
-      ['Gruvbox Dark', 'base16/gruvbox-dark-hard'],
+      ['GitHub Dark', 'github-dark', 'dark'],
+      ['Monokai', 'monokai', 'dark'],
+      ['Dracula', 'base16/dracula', 'dark'],
+      ['Nord', 'nord', 'dark'],
+      ['Night Owl', 'night-owl', 'dark'],
+      ['Tokyo Night Dark', 'tokyo-night-dark', 'dark'],
+      ['Visual Studio 2015', 'vs2015', 'dark'],
+      ['Solarized Dark', 'base16/solarized-dark', 'dark'],
+      ['Gruvbox Dark', 'base16/gruvbox-dark-hard', 'dark'],
+      ['GitHub Light', 'github', 'light'],
+      ['Visual Studio Light', 'vs', 'light'],
+      ['Solarized Light', 'base16/solarized-light', 'light'],
     ];
+    const codeMode = () => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+    const codeThemesFor = (mode) => CODE_THEMES.filter(t => !t[2] || t[2] === mode);
+    function codeTheme() {
+      const mode = codeMode();
+      // 'gui.codeTheme' is the older single choice: it still counts in the mode it was made for
+      const stored = store.get('gui.codeTheme.' + mode, null) ?? store.get('gui.codeTheme', '');
+      return codeThemesFor(mode).some(t => t[1] === stored) ? stored : '';
+    }
     function applyCodeTheme() {
-      const stored = store.get('gui.codeTheme', '');
-      const light = document.documentElement.dataset.theme === 'light';
-      const choice = stored === 'auto' ? '' : stored || (light ? 'atom-one-light' : 'atom-one-dark');
-      if (choice) {
+      const stored = codeTheme();
+      const choice = stored === 'auto' ? '' : stored || `atom-one-${codeMode()}`;
+      if (choice && stored !== 'auto') {
         document.body.classList.remove('hl-auto');
         $('hlTheme').href = `/vendor/hljs-styles/${choice}.min.css`;
       } else {
         document.body.classList.add('hl-auto');
         $('hlTheme').removeAttribute('href');
       }
+    }
+    // the dropdown lists the current mode's themes
+    function syncCodeThemeSelect() {
+      const ct = $('codeTheme');
+      ct.innerHTML = codeThemesFor(codeMode()).map(t => `<option value="${esc(t[1])}">${esc(t[0])}</option>`).join('');
+      ct.value = codeTheme();
+      ct.onchange = () => { store.set('gui.codeTheme.' + codeMode(), ct.value); applyCodeTheme(); };
     }
     function applyTheme(t) {
       document.documentElement.dataset.theme = t;
@@ -172,16 +186,15 @@
     $('themeSeg').onclick = (e) => {
       const b = e.target.closest('button[data-theme]'); if (!b) return;
       store.set('gui.theme', b.dataset.theme); applyTheme(b.dataset.theme); syncThemeSeg();
+      applyGrad(); syncPrimaryColor();      // each mode has its own default accent
+      syncCodeThemeSelect();                // ... and its own code themes
     };
     function openSettings() {
       if (typeof renderTrustedDomains === 'function') renderTrustedDomains();
       preloadFontPreviews();
       fillFontSelect($('uiFont'), UI_FONTS, 'gui.uiFont', 'Google Sans');
       fillFontSelect($('monoFont'), MONO_FONTS, 'gui.monoFont', 'JetBrains Mono');
-      const ct = $('codeTheme');
-      ct.innerHTML = CODE_THEMES.map(t => `<option value="${esc(t[1])}">${esc(t[0])}</option>`).join('');
-      ct.value = store.get('gui.codeTheme', '');
-      ct.onchange = () => { store.set('gui.codeTheme', ct.value); applyCodeTheme(); };
+      syncCodeThemeSelect();
       const dl = $('dictLang');
       dl.value = store.get('gui.dictLang', 'en-US');
       if (dl.selectedIndex < 0) dl.value = 'en-US';
@@ -192,20 +205,17 @@
       cw.onchange = () => { store.set('gui.chatW', cw.value); applyChatWidth(); };
       const pc = $('primaryColor');
       const rs = $('primaryReset');
-      const syncReset = () => { rs.hidden = pc.value.toLowerCase() === GRAD_DEFAULT[0]; };
-      pc.value = store.get('gui.gradA', GRAD_DEFAULT[0]);
       pc.oninput = () => {
         store.set('gui.gradA', pc.value);
         store.set('gui.gradB', mixHex(pc.value, '#000000', 0.15));
-        applyGrad(); syncReset();
+        applyGrad(); syncPrimaryColor();
       };
       rs.onclick = (e) => {
         e.stopPropagation();
         try { localStorage.removeItem('gui.gradA'); localStorage.removeItem('gui.gradB'); } catch { }
-        pc.value = GRAD_DEFAULT[0];
-        applyGrad(); syncReset();
+        applyGrad(); syncPrimaryColor();
       };
-      syncReset();
+      syncPrimaryColor();
       syncThemeSeg(); syncBell();
       $('settings').classList.add('open');
     }
@@ -216,7 +226,18 @@
     // temporary picker are still in this browser's storage and keep applying; otherwise the default periwinkle
     // (the second colour is the first darkened 15%, as the Settings picker does).
     const GRAD_DEFAULT = ['#518af6', '#4575d1'];
-    const gradColors = () => [store.get('gui.gradA', GRAD_DEFAULT[0]), store.get('gui.gradB', GRAD_DEFAULT[1])];
+    // each mode's default accent (light is Nord Snow), unless a primary colour was picked
+    const GRAD_LIGHT = ['#5e81ac', '#506e92'];
+    const themeAccent = () => document.documentElement.dataset.theme === 'light' ? GRAD_LIGHT : GRAD_DEFAULT;
+    const gradColors = () => {
+      const d = themeAccent();
+      return [store.get('gui.gradA', d[0]), store.get('gui.gradB', d[1])];
+    };
+    function syncPrimaryColor() {
+      const pc = $('primaryColor');
+      pc.value = gradColors()[0];
+      $('primaryReset').hidden = pc.value.toLowerCase() === themeAccent()[0];
+    }
     function mixHex(a, b, f) {
       const c = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
       const x = c(a), y = c(b);

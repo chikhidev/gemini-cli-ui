@@ -67,34 +67,34 @@
     }
 
     :root[data-theme="light"] {
-      --grad-a: #5b5fc7;
-      --grad-b: #4a4eb5;
-      --bg: #ffffff;               /* main chat card and file viewer: crisp white sheet */
-      --surface: #f2f4f7;          /* outer app chrome and sidebar: soft cool-stone neutral */
-      --surface2: #e6e9ef;
-      --hover: #e2e6ed;
-      --line: #dfe3eb;
-      --line2: #cdd3de;
-      --text: #111827;
-      --text2: #374151;
-      --muted: #646d7c;
-      --faint: #cbd0da;
-      --code: #f6f8fa;
-      --composer-bg: #ffffff;
-      --composer-line: #d4d8e2;
-      --composer-ph: #7c8494;
-      --composer-ic: #4b5563;
-      --composer-hover: #eef0f5;
-      --send-off-bg: #e2e5ec;
-      --send-off-fg: #9ca3af;
-      --send-bg: #111827;
-      --send-fg: #fff;
-      --gutter: #9ca3af;
-      --side-btn: #ffffff;
-      --side-btn-line: #d5d9e2;
-      --side-active: #e1e5ee;
-      --bubble: #f1f3f8;
-      --bubble-line: #dfe3ec;
+      --grad-a: #5e81ac;
+      --grad-b: #506e92;
+      --bg: #fbfcfe;               /* Nord Snow: chat card and file viewer */
+      --surface: #eceff4;          /* app chrome and sidebar */
+      --surface2: #e1e6ee;
+      --hover: #dde3ec;
+      --line: #dbe0e9;
+      --line2: #cbd3e0;
+      --text: #2e3440;
+      --text2: #434c5e;
+      --muted: #667086;
+      --faint: #c3ccda;
+      --code: #f1f4f8;
+      --composer-bg: #fbfcfe;
+      --composer-line: #cbd3e0;
+      --composer-ph: #667086;
+      --composer-ic: #434c5e;
+      --composer-hover: #eceff4;
+      --send-off-bg: #e1e6ee;
+      --send-off-fg: #667086;
+      --send-bg: #2e3440;
+      --send-fg: #fbfcfe;
+      --gutter: #939bac;
+      --side-btn: #fbfcfe;
+      --side-btn-line: #cbd3e0;
+      --side-active: #e1e6ee;
+      --bubble: #eceff4;
+      --bubble-line: #dbe0e9;
     }
 
     /* a display rule must never beat the hidden attribute */
@@ -927,6 +927,13 @@
       border-bottom: 1px solid var(--line);
       background: var(--bg);
       flex-shrink: 0;
+    }
+
+    .header-logo {
+      width: 24px;
+      height: 24px;
+      user-select: none;
+      color: var(--text);              /* white in dark mode, dark in light mode */
     }
 
     .header-title {
@@ -6681,7 +6688,14 @@
         display: grid;
         position: fixed;
         top: 5px;
-        left: 8px;
+        left: 40px;                      /* the logo sits to its left */
+        z-index: 32
+      }
+
+      .header-logo {
+        position: fixed;
+        top: 7px;
+        left: 10px;
         z-index: 32
       }
 
@@ -6690,7 +6704,7 @@
       }
 
       body.collapsed header {
-        padding-left: 40px
+        padding-left: 72px
       }
     }
 
@@ -7906,12 +7920,12 @@
       .top-tools {
         position: fixed;
         top: 5px;
-        left: 40px;
+        left: 72px;
         z-index: 32
       }
 
       body.collapsed header {
-        padding-left: 108px              /* room for the three buttons */
+        padding-left: 140px              /* room for the logo and the three buttons */
       }
     }
 
@@ -9467,4 +9481,39 @@
 
     :root[data-theme="light"] .ov-nums .minus {
       color: #dc2626
+    }
+
+    /* light mode: controls are raised white (the theme's --bg) with an outline, so they read as buttons on a card */
+    :root[data-theme="light"] .set-card .set-row select,
+    :root[data-theme="light"] .set-card .set-reset,
+    :root[data-theme="light"] .set-reset,
+    :root[data-theme="light"] .glass-btn,
+    :root[data-theme="light"] .btn:not(.primary) {
+      background-color: var(--bg);
+      border: 1px solid var(--line2);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgba(20, 30, 50, .12)
+    }
+
+    :root[data-theme="light"] .set-card .set-row select:hover,
+    :root[data-theme="light"] .set-card .set-row select:focus,
+    :root[data-theme="light"] .set-card .set-reset:hover,
+    :root[data-theme="light"] .set-reset:hover,
+    :root[data-theme="light"] .btn:not(.primary):hover {
+      background-color: var(--surface);
+      border: 1px solid var(--muted)
+    }
+
+    :root[data-theme="light"] .set-card .seg {
+      background: var(--surface2);
+      border: 1px solid var(--line2)
+    }
+
+    :root[data-theme="light"] .set-card .seg button.on {
+      background: var(--bg);
+      box-shadow: 0 0 0 1px var(--line2), 0 1px 3px rgba(20, 30, 50, .18)
+    }
+
+    :root[data-theme="light"] .set-card .seg button {
+      height: 24px
     }
